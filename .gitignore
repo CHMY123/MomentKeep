@@ -1,1 +1,41 @@
-/application.yml
+# 忽略构建产物
+target/
+build/
+
+# 忽略 Maven 包装器
+.mvn/wrapper/maven-wrapper.jar
+
+# 确保 backend 目录下的文件被追踪
+!backend/
+!backend/**/*
+
+# 忽略所有 application.yml 文件，包括 backend 目录下的
+**/application.yml
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
