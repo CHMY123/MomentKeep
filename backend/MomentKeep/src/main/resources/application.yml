@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: MomentKeep
+  datasource:
+    url: jdbc:mysql://gateway01.ap-southeast-1.prod.alicloud.tidbcloud.com:4000/momentkeep
+    username: 3M8M5Vr1pf71qDH.root
+    password: KKrZhh0RGEMUq7k6
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      max-lifetime: 30000
+      validation-timeout: 3000
+      idle-timeout: 60000
+      connection-test-query: SELECT 1
+  sql:
+    init:
+      mode: never
+      schema-locations: classpath:sql/tidb_schema.sql
+      data-locations: classpath:sql/data.sql
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+
+server:
+  port: 8080
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: cn.edu.scnu.momentkeep.entity
+
+binfenyun:
+  accessKey: dTgm44PwGnWWZ4kwFFzjTqI7
+  secretKey: FeILNZo7fPGU9ZxECQwEbTE3TcbdC0X
+  bucketName: momentkeep
+  endpoint: https://s3.bitiful.net
+  region: cn-east-1
+
+deepseek:
+  api:
+    key: sk-93149deb3acd4900bfabfaf3e638cace
+    url: https://api.deepseek.com
+
+jwt:
+  secret:
+    key: momentkeep_secret_key
+  expiration:
+    time: 86400000
+
+logging:
+  level:
+    cn.edu.scnu.momentkeep: info
