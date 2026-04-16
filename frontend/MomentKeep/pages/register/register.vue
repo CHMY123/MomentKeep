@@ -1,78 +1,88 @@
 <template>
-  <div class="register-container">
-    <div class="register-card">
-      <div class="logo-container">
-        <img src="../../static/logo.png" alt="朝暮记" class="logo" />
-        <h1 class="app-name">朝暮记</h1>
-        <p class="app-slogan">朝有目标，暮有记录</p>
-      </div>
-      
-      <form @submit.prevent="handleRegister">
-        <div class="form-item">
-          <label for="username">用户名</label>
-          <input 
-            type="text" 
-            id="username" 
-            v-model="formData.username" 
-            placeholder="请输入用户名（3-20位）" 
-            required
-          />
-        </div>
-        
-        <div class="form-item">
-          <label for="password">密码</label>
-          <input 
-            type="password" 
-            id="password" 
-            v-model="formData.password" 
-            placeholder="请输入密码（至少6位）" 
-            required
-          />
-        </div>
-        
-        <div class="form-item">
-          <label for="nickname">昵称</label>
-          <input 
-            type="text" 
-            id="nickname" 
-            v-model="formData.nickname" 
-            placeholder="请输入昵称" 
-            required
-          />
-        </div>
-        
-        <div class="form-item">
-          <label for="phone">手机号</label>
-          <input 
-            type="tel" 
-            id="phone" 
-            v-model="formData.phone" 
-            placeholder="请输入手机号" 
-            required
-          />
-        </div>
-        
-        <div class="form-item">
-          <label for="email">邮箱（选填）</label>
-          <input 
-            type="email" 
-            id="email" 
-            v-model="formData.email" 
-            placeholder="请输入邮箱"
-          />
-        </div>
-        
-        <button type="submit" class="register-btn" :disabled="loading">
-          {{ loading ? '注册中...' : '注册' }}
-        </button>
-        
-        <div class="login-link">
-          <span>已有账号？</span>
-          <a @click="goToLogin">立即登录</a>
-        </div>
-      </form>
-    </div>
-  </div>
+  <view class="register-container">
+    <view class="register-card">
+      <!-- LOGO 区域（已修复） -->
+      <view class="logo-container">
+        <image src="../../static/logo.png" class="logo" mode="aspectFit"></image>
+        <view class="title-wrapper">
+          <text class="app-name">朝暮记</text>
+          <text class="app-slogan">朝有目标，暮有记录</text>
+        </view>
+      </view>
+
+      <!-- 用户名 -->
+      <view class="form-item">
+        <text class="label">用户名</text>
+        <input
+          v-model="formData.username"
+          type="text"
+          placeholder="请输入用户名（3-20位）"
+          class="input-box"
+        />
+      </view>
+
+      <!-- 密码 -->
+      <view class="form-item">
+        <text class="label">密码</text>
+        <input
+          v-model="formData.password"
+          type="password"
+          placeholder="请输入密码（至少6位）"
+          class="input-box"
+        />
+      </view>
+
+      <!-- 昵称 -->
+      <view class="form-item">
+        <text class="label">昵称</text>
+        <input
+          v-model="formData.nickname"
+          type="text"
+          placeholder="请输入昵称"
+          class="input-box"
+        />
+      </view>
+
+      <!-- 手机号 -->
+      <view class="form-item">
+        <text class="label">手机号</text>
+        <input
+          v-model="formData.phone"
+          type="tel"
+          placeholder="请输入手机号"
+          class="input-box"
+        />
+      </view>
+
+      <!-- 邮箱（选填） -->
+      <view class="form-item">
+        <text class="label">邮箱（选填）</text>
+        <input
+          v-model="formData.email"
+          type="text"
+          placeholder="请输入邮箱"
+          class="input-box"
+        />
+      </view>
+
+      <!-- 协议 -->
+      <view class="checkbox-item">
+        <checkbox v-model="formData.agreement" />
+        <text class="checkbox-text">我已阅读并同意用户协议和隐私政策</text>
+      </view>
+
+      <!-- 注册按钮 -->
+      <button class="register-btn" @click="handleRegister" :disabled="loading">
+        {{ loading ? '注册中...' : '注册' }}
+      </button>
+
+      <!-- 去登录 -->
+      <view class="login-row">
+        <text>已有账号？</text>
+        <text class="link" @click="goToLogin">立即登录</text>
+      </view>
+    </view>
+  </view>
 </template>
 
 <script setup>
@@ -86,45 +96,66 @@ const formData = ref({
   password: '',
   nickname: '',
   phone: '',
-  email: ''
+  email: '',
+  agreement: false
 })
 
 const loading = ref(false)
 
+// 注册
 const handleRegister = async () => {
-  if (!formData.value.username || !formData.value.password || !formData.value.nickname || !formData.value.phone) {
-    uni.showToast({ title: '请填写必填项', icon: 'none' })
+  if (!formData.value.username) {
+    uni.showToast({ title: '请输入用户名', icon: 'none' })
     return
   }
-  
+  if (!formData.value.password || formData.value.password.length < 6) {
+    uni.showToast({ title: '密码至少6位', icon: 'none' })
+    return
+  }
+  if (!formData.value.nickname) {
+    uni.showToast({ title: '请输入昵称', icon: 'none' })
+    return
+  }
+  if (!formData.value.phone) {
+    uni.showToast({ title: '请输入手机号', icon: 'none' })
+    return
+  }
+  if (!formData.value.agreement) {
+    uni.showToast({ title: '请同意用户协议', icon: 'none' })
+    return
+  }
+
   loading.value = true
-  
   try {
-    const response = await uni.request({
+    const res = await uni.request({
       url: 'http://localhost:8080/api/user/register',
       method: 'POST',
       data: formData.value
     })
-    
-    if (response.data.code === 200) {
+
+    if (res.data.code === 200) {
       uni.showToast({ title: '注册成功', icon: 'success' })
-      router.push('/pages/login/login')
+      setTimeout(() => {
+        router.push('/pages/login/login')
+      }, 1000)
     } else {
-      uni.showToast({ title: response.data.message, icon: 'none' })
+      uni.showToast({ title: res.data.message || '注册失败', icon: 'none' })
     }
-  } catch (error) {
-    uni.showToast({ title: '注册失败，请稍后重试', icon: 'none' })
+  } catch (e) {
+    uni.showToast({ title: '网络异常，请重试', icon: 'none' })
   } finally {
     loading.value = false
   }
 }
 
+// 去登录
 const goToLogin = () => {
   router.push('/pages/login/login')
 }
 </script>
 
 <style scoped>
+/* 页面容器 */
 .register-container {
   display: flex;
   justify-content: center;
@@ -134,8 +165,9 @@ const goToLogin = () => {
   padding: 20px;
 }
 
+/* 注册卡片 */
 .register-card {
-  background-color: white;
+  background-color: #fff;
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   padding: 40px 30px;
@@ -143,95 +175,103 @@ const goToLogin = () => {
   max-width: 400px;
 }
 
+/* LOGO 区域 */
 .logo-container {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-bottom: 40px;
 }
 
 .logo {
   width: 80px;
   height: 80px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+.title-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .app-name {
   font-size: 28px;
   font-weight: 600;
   color: #C2977F;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .app-slogan {
   font-size: 14px;
-  color: #999999;
+  color: #999;
 }
 
+/* 表单项 */
 .form-item {
   margin-bottom: 20px;
 }
 
-.form-item label {
-  display: block;
+.label {
   font-size: 14px;
-  font-weight: 500;
-  color: #333333;
+  color: #333;
   margin-bottom: 8px;
+  display: block;
 }
 
-.form-item input {
+.input-box {
   width: 100%;
-  padding: 14px 16px;
+  height: 50px;
   border: 2px solid #E8E1D6;
   border-radius: 8px;
+  padding: 0 16px;
   font-size: 16px;
-  color: #333333;
-  transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
-.form-item input:focus {
-  outline: none;
+.input-box:focus {
   border-color: #C2977F;
-  box-shadow: 0 0 0 3px rgba(194, 151, 127, 0.1);
 }
 
+/* 复选框 */
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.checkbox-text {
+  font-size: 14px;
+  color: #666;
+  margin-left: 6px;
+}
+
+/* 注册按钮 */
 .register-btn {
   width: 100%;
-  padding: 16px;
+  height: 50px;
   background-color: #C2977F;
-  color: white;
-  border: none;
+  color: #fff;
   border-radius: 8px;
   font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-bottom: 20px;
-  margin-top: 20px;
-}
-
-.register-btn:hover {
-  background-color: #A8846B;
+  font-weight: 500;
+  margin-top: 8px;
 }
 
 .register-btn:disabled {
   background-color: #D8C8BE;
-  cursor: not-allowed;
 }
 
-.login-link {
+/* 登录链接 */
+.login-row {
   text-align: center;
+  margin-top: 20px;
   font-size: 14px;
-  color: #666666;
+  color: #666;
 }
 
-.login-link a {
+.link {
   color: #C2977F;
-  text-decoration: none;
-  font-weight: 500;
-  margin-left: 8px;
-}
-
-.login-link a:hover {
-  text-decoration: underline;
+  margin-left: 6px;
 }
 </style>
