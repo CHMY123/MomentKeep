@@ -34,14 +34,21 @@
 
       <!-- 记住我 -->
       <view class="checkbox-item">
-        <checkbox v-model="formData.remember" />
+        <checkbox-group @change="handleRememberChange">
+          <checkbox :checked="formData.remember" value="remember" />
+        </checkbox-group>
         <text class="checkbox-text">记住我</text>
       </view>
 
       <!-- 协议 -->
       <view class="checkbox-item">
-        <checkbox v-model="formData.agreement" />
-        <text class="checkbox-text">我已阅读并同意用户协议和隐私政策</text>
+        <checkbox-group @change="handleAgreementChange">
+          <checkbox :checked="formData.agreement" value="agreement" />
+        </checkbox-group>
+        <text class="checkbox-text">我已阅读并同意</text>
+        <text class="link" @click="showUserAgreement">用户协议</text>
+        <text class="checkbox-text">和</text>
+        <text class="link" @click="showPrivacyPolicy">隐私政策</text>
       </view>
 
       <!-- 登录按钮 -->
@@ -59,6 +66,12 @@
 </template>
 
 <script setup>
+/**
+ * MomentKeep 朝暮记 - 登录页面
+ * @description 处理用户登录认证，包括用户名密码验证和JWT令牌管理
+ * @author MomentKeep Team
+ * @since 2026-04-18
+ */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../store/user'
@@ -66,6 +79,7 @@ import { useUserStore } from '../../store/user'
 const router = useRouter()
 const userStore = useUserStore()
 
+// 表单数据模型
 const formData = ref({
   username: '',
   password: '',
@@ -73,10 +87,15 @@ const formData = ref({
   agreement: false
 })
 
+// 加载状态
 const loading = ref(false)
 
-// 登录
+/**
+ * 处理用户登录
+ * @description 验证表单数据，调用登录API，成功后存储用户信息和Token
+ */
 const handleLogin = async () => {
+  // 表单验证
   if (!formData.value.username || !formData.value.password) {
     uni.showToast({ title: '请输入用户名和密码', icon: 'none' })
     return
@@ -88,14 +107,14 @@ const handleLogin = async () => {
 
   loading.value = true
   try {
-    const response = await uni.request({
-      url: 'http://localhost:8080/api/user/login',
+    const res = await uni.request({
+      url: '/api/user/login',
       method: 'POST',
       data: formData.value
     })
 
-    if (response.data.code === 200) {
-      const { token, user } = response.data.data
+    if (res.data.code === 200) {
+      const { token, user } = res.data.data
       userStore.setUser(user)
       userStore.setToken(token)
       uni.showToast({ title: '登录成功', icon: 'success' })
@@ -103,7 +122,7 @@ const handleLogin = async () => {
         router.push('/pages/index/index')
       }, 1000)
     } else {
-      uni.showToast({ title: response.data.message || '登录失败', icon: 'none' })
+      uni.showToast({ title: res.data.message || '登录失败', icon: 'none' })
     }
   } catch (error) {
     uni.showToast({ title: '网络异常，请重试', icon: 'none' })
@@ -112,9 +131,49 @@ const handleLogin = async () => {
   }
 }
 
-// 去注册
+/**
+ * 跳转到注册页面
+ */
 const goToRegister = () => {
   router.push('/pages/register/register')
+}
+
+/**
+ * 显示用户协议弹窗
+ */
+const showUserAgreement = () => {
+  uni.showModal({
+    title: '用户协议',
+    content: '用户协议内容...',
+    showCancel: false,
+    confirmText: '我知道了'
+  })
+}
+
+/**
+ * 显示隐私政策弹窗
+ */
+const showPrivacyPolicy = () => {
+  uni.showModal({
+    title: '隐私政策',
+    content: '隐私政策内容...',
+    showCancel: false,
+    confirmText: '我知道了'
+  })
+}
+
+/**
+ * 处理"记住我"复选框变化
+ */
+const handleRememberChange = (e) => {
+  formData.value.remember = e.detail.value.includes('remember')
+}
+
+/**
+ * 处理用户协议复选框变化
+ */
+const handleAgreementChange = (e) => {
+  formData.value.agreement = e.detail.value.includes('agreement')
 }
 </script>
 

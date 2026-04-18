@@ -1,6 +1,7 @@
 package cn.edu.scnu.momentkeep.service.impl;
 
 import cn.edu.scnu.momentkeep.common.BusinessException;
+import cn.edu.scnu.momentkeep.config.S3Config;
 import cn.edu.scnu.momentkeep.dto.request.ChangePasswordDTO;
 import cn.edu.scnu.momentkeep.dto.request.LoginDTO;
 import cn.edu.scnu.momentkeep.dto.request.UpdateProfileDTO;
@@ -10,25 +11,34 @@ import cn.edu.scnu.momentkeep.entity.Countdown;
 import cn.edu.scnu.momentkeep.entity.Feedback;
 import cn.edu.scnu.momentkeep.entity.Todo;
 import cn.edu.scnu.momentkeep.entity.User;
+import cn.edu.scnu.momentkeep.entity.UserSetting;
 import cn.edu.scnu.momentkeep.mapper.CheckinMapper;
 import cn.edu.scnu.momentkeep.mapper.CountdownMapper;
 import cn.edu.scnu.momentkeep.mapper.FeedbackMapper;
 import cn.edu.scnu.momentkeep.mapper.TodoMapper;
 import cn.edu.scnu.momentkeep.mapper.UserMapper;
+import cn.edu.scnu.momentkeep.mapper.UserSettingMapper;
 import cn.edu.scnu.momentkeep.security.JwtTokenProvider;
 import cn.edu.scnu.momentkeep.service.UserService;
 import cn.edu.scnu.momentkeep.vo.LoginResponseVO;
 import cn.edu.scnu.momentkeep.vo.UserProfileVO;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.redis.core.RedisTemplate;
+import java.io.IOException;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +53,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final JwtTokenProvider jwtTokenProvider;
     private final HttpServletRequest request;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final S3Client s3Client;
+    private final S3Config s3Config;
+    private final UserSettingMapper userSettingMapper;
     
     @Override
     public void register(UserRegisterDTO dto) {
@@ -106,7 +119,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public UserProfileVO getProfile() {
         User user = getCurrentUser();
-        
+
         UserProfileVO profile = new UserProfileVO();
         profile.setId(user.getId());
         profile.setUsername(user.getUsername());
@@ -114,7 +127,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         profile.setEmail(user.getEmail());
         profile.setPhone(user.getPhone());
         profile.setAvatar(user.getAvatar());
-        
+
+        UserSetting setting = userSettingMapper.selectOne(
+            new QueryWrapper<UserSetting>().eq("user_id", user.getId())
+        );
+        if (setting != null) {
+            profile.setBackgroundImage(setting.getBackgroundImage());
+        }
+
         return profile;
     }
     
@@ -140,15 +160,99 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     
     @Override
     public String uploadAvatar(MultipartFile file) {
-        // 这里简化处理，实际应该上传到云存储
-        // 暂时返回一个默认的头像URL
-        return "https://img.icons8.com/ios-filled/50/000000/user.png";
+        try {
+            // 生成唯一的文件名
+            String fileName = "avatars/" + UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+
+            // 上传文件到缤纷云 S3
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(s3Config.getBucketName())
+                    .key(fileName)
+                    .build();
+
+            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
+
+            // 生成文件的 URL - 使用正确的缤纷云 URL 格式
+            String fileUrl = "https://" + s3Config.getBucketName() + ".s3.bitiful.net/" + fileName;
+
+            // 更新数据库中用户的头像字段
+            User currentUser = getCurrentUser();
+            userMapper.updateAvatarById(currentUser.getId(), fileUrl);
+
+            return fileUrl;
+        } catch (IOException e) {
+            throw new BusinessException("头像上传失败：" + e.getMessage());
+        }
+    }
+    
+    @Override
+    public String uploadBackground(MultipartFile file) {
+        try {
+            String fileName = "backgrounds/" + UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(s3Config.getBucketName())
+                    .key(fileName)
+                    .build();
+
+            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
+
+            String fileUrl = "https://" + s3Config.getBucketName() + ".s3.bitiful.net/" + fileName;
+
+            User currentUser = getCurrentUser();
+            UserSetting setting = userSettingMapper.selectOne(
+                new QueryWrapper<UserSetting>().eq("user_id", currentUser.getId())
+            );
+            if (setting == null) {
+                setting = new UserSetting();
+                setting.setUserId(currentUser.getId());
+                setting.setBackgroundImage(fileUrl);
+                setting.setTheme("light");
+                setting.setAiAutoFill(true);
+                setting.setNotifications(true);
+                userSettingMapper.insert(setting);
+            } else {
+                setting.setBackgroundImage(fileUrl);
+                userSettingMapper.updateById(setting);
+            }
+
+            return fileUrl;
+        } catch (IOException e) {
+            throw new BusinessException("背景图上传失败：" + e.getMessage());
+        }
+    }
+
+    @Override
+    public void clearBackground() {
+        User currentUser = getCurrentUser();
+        UserSetting setting = userSettingMapper.selectOne(
+            new QueryWrapper<UserSetting>().eq("user_id", currentUser.getId())
+        );
+        if (setting != null) {
+            if (setting.getBackgroundImage() != null) {
+                String backgroundImageUrl = setting.getBackgroundImage();
+                String objectKey = backgroundImageUrl.substring(backgroundImageUrl.lastIndexOf(".s3.bitiful.net/") + 17);
+
+                DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                        .bucket(s3Config.getBucketName())
+                        .key(objectKey)
+                        .build();
+                s3Client.deleteObject(deleteObjectRequest);
+            }
+
+            UpdateWrapper<UserSetting> updateWrapper = new UpdateWrapper<>();
+            updateWrapper.eq("user_id", currentUser.getId())
+                    .set("background_image", null);
+            userSettingMapper.update(null, updateWrapper);
+        }
     }
     
     @Override
     public void logout() {
-        String token = request.getHeader("Authorization").substring(7);
-        redisTemplate.delete("token:" + token);
+        String token = getTokenFromRequest();
+        if (token != null) {
+            redisTemplate.delete("token:" + token);
+        }
     }
     
     @Override
@@ -169,8 +273,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         userMapper.updateById(user);
         
         // 3. 清除用户token
-        String token = request.getHeader("Authorization").substring(7);
-        redisTemplate.delete("token:" + token);
+        String token = getTokenFromRequest();
+        if (token != null) {
+            redisTemplate.delete("token:" + token);
+        }
     }
     
     @Override
@@ -194,8 +300,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         userMapper.updateById(user);
         
         // 清除用户token，强制重新登录
-        String token = request.getHeader("Authorization").substring(7);
-        redisTemplate.delete("token:" + token);
+        String token = getTokenFromRequest();
+        if (token != null) {
+            redisTemplate.delete("token:" + token);
+        }
     }
     
     @Override
@@ -205,7 +313,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     
     @Override
     public User getCurrentUser() {
-        String username = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String username = null;
+        if (principal instanceof String) {
+            username = (String) principal;
+        } else if (principal instanceof org.springframework.security.core.userdetails.User) {
+            username = ((org.springframework.security.core.userdetails.User) principal).getUsername();
+        }
+        if (username == null) {
+            throw new BusinessException("无法获取当前用户信息");
+        }
         return getByUsername(username);
+    }
+    
+    /**
+     * 从请求头中获取 token
+     */
+    private String getTokenFromRequest() {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
     }
 }

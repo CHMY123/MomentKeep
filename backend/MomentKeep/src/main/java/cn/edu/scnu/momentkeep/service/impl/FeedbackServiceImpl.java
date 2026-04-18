@@ -14,6 +14,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +37,7 @@ public class FeedbackServiceImpl implements FeedbackService {
             ? dto.getContact() 
             : currentUser.getPhone());
         feedback.setStatus(0); // 0表示未处理
+        feedback.setCreateTime(LocalDateTime.now());
         
         feedbackMapper.insert(feedback);
     }

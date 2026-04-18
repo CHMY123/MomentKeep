@@ -1,142 +1,127 @@
 <template>
   <Layout>
-    <div class="profile-container">
+    <view class="profile-container">
       <!-- 用户信息卡片 -->
-      <div class="user-card">
-        <div class="user-info-header">
-          <div class="avatar-section">
-            <div class="avatar" @click="uploadAvatar">
-              <img :src="userInfo.avatar" alt="avatar" />
-              <div class="avatar-edit">
-                <div class="icon-camera"></div>
-              </div>
-            </div>
-          </div>
-          <div class="edit-btn-container">
+      <view class="user-card">
+        <view class="user-info-header">
+          <view class="avatar-section">
+            <view class="avatar" @click="uploadAvatar">
+              <image :src="userInfo.avatar || 'https://img.icons8.com/ios-filled/50/000000/user.png'" alt="avatar" />
+              <view class="avatar-edit">
+                <view class="icon-camera"></view>
+              </view>
+            </view>
+          </view>
+          <view class="edit-btn-container">
             <button class="edit-profile-btn" @click="toggleEditMode">
               {{ isEditMode ? '取消' : '变更资料' }}
             </button>
-          </div>
-          <div class="user-info-grid">
-            <div class="info-item">
-              <div class="info-label">用户名</div>
-              <div class="info-value">{{ userInfo.username }}</div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">昵称</div>
-              <div v-if="!isEditMode" class="info-value">{{ userInfo.nickname }}</div>
-              <input v-else type="text" v-model="formData.nickname" placeholder="请输入昵称" />
-            </div>
-            <div class="info-item">
-              <div class="info-label">手机号</div>
-              <div v-if="!isEditMode" class="info-value">{{ userInfo.phone }}</div>
-              <input v-else type="tel" v-model="formData.phone" placeholder="请输入手机号" />
-            </div>
-            <div class="info-item">
-              <div class="info-label">邮箱</div>
-              <div v-if="!isEditMode" class="info-value">{{ userInfo.email }}</div>
-              <input v-else type="email" v-model="formData.email" placeholder="请输入邮箱" />
-            </div>
-          </div>
+          </view>
+          <view class="user-info-grid">
+            <view class="info-item">
+              <view class="info-label">用户名</view>
+              <view class="info-value">{{ userInfo.username }}</view>
+            </view>
+            <view class="info-item">
+              <view class="info-label">昵称</view>
+              <view v-if="!isEditMode" class="info-value">{{ userInfo.nickname }}</view>
+              <input v-else type="text" :value="formData.nickname" @input="formData.nickname = $event.target.value" placeholder="请输入昵称" class="input-box" />
+            </view>
+            <view class="info-item">
+              <view class="info-label">手机号</view>
+              <view v-if="!isEditMode" class="info-value">{{ userInfo.phone }}</view>
+              <input v-else type="tel" :value="formData.phone" @input="formData.phone = $event.target.value" placeholder="请输入手机号" class="input-box" />
+            </view>
+            <view class="info-item">
+              <view class="info-label">邮箱</view>
+              <view v-if="!isEditMode" class="info-value">{{ userInfo.email }}</view>
+              <input v-else type="email" :value="formData.email" @input="formData.email = $event.target.value" placeholder="请输入邮箱" class="input-box" />
+            </view>
+          </view>
           <button v-if="isEditMode" class="submit-btn" @click="updateProfile">保存修改</button>
-        </div>
-      </div>
-      
-      <!-- 反馈提交 -->
-      <div class="form-card">
-        <div class="form-title">意见反馈</div>
-        
-        <div class="form-item">
-          <textarea v-model="feedbackContent" placeholder="请输入您的反馈..." rows="4" />
-        </div>
-        
-        <div class="form-item">
-          <div class="form-label">联系方式</div>
-          <div class="contact-info">{{ userInfo.phone }}</div>
-        </div>
-        
-        <button class="submit-btn" @click="submitFeedback">提交反馈</button>
-      </div>
+        </view>
+      </view>
       
       <!-- 账户操作 -->
-      <div class="action-card">
-        <div class="form-title">账户操作</div>
+      <view class="action-card">
+        <view class="form-title">账户操作</view>
         
-        <div class="action-item" @click="showChangePasswordDialog">
-          <div class="icon-lock"></div>
-          <div class="action-text">修改密码</div>
-        </div>
+        <view class="action-item" @click="showChangePasswordDialog">
+          <view class="icon-lock"></view>
+          <view class="action-text">修改密码</view>
+        </view>
         
-        <div class="action-item" @click="showDeleteDialog">
-          <div class="icon-close-circle"></div>
-          <div class="action-text">注销账户</div>
-        </div>
-      </div>
+        <view class="action-item" @click="logout">
+          <view class="icon-logout"></view>
+          <view class="action-text">退出登录</view>
+        </view>
+        
+        <view class="action-item" @click="showDeleteDialog">
+          <view class="icon-close-circle"></view>
+          <view class="action-text">注销账户</view>
+        </view>
+      </view>
       
       <!-- 注销确认对话框 -->
-      <div v-if="isDeleteDialogVisible" class="dialog-overlay" @click="closeDeleteDialog">
-        <div class="dialog-content" @click.stop>
-          <div class="dialog-header">
-            <div class="dialog-title">注销账户</div>
-            <div class="dialog-close" @click="closeDeleteDialog">×</div>
-          </div>
-          <div class="dialog-body">
-            <p>您确定要注销账户吗？注销后所有数据将被删除，且无法恢复。</p>
-          </div>
-          <div class="dialog-footer">
+      <view v-if="isDeleteDialogVisible" class="dialog-overlay" @click="closeDeleteDialog">
+        <view class="dialog-content" @click.stop>
+          <view class="dialog-header">
+            <view class="dialog-title">注销账户</view>
+            <view class="dialog-close" @click="closeDeleteDialog">×</view>
+          </view>
+          <view class="dialog-body">
+            <text>您确定要注销账户吗？注销后所有数据将被删除，且无法恢复。</text>
+          </view>
+          <view class="dialog-footer">
             <button class="dialog-btn cancel-btn" @click="closeDeleteDialog">取消</button>
             <button class="dialog-btn confirm-btn" @click="confirmDeleteAccount">确定注销</button>
-          </div>
-        </div>
-      </div>
+          </view>
+        </view>
+      </view>
       
       <!-- 修改密码对话框 -->
-      <div v-if="isChangePasswordDialogVisible" class="dialog-overlay" @click="closeChangePasswordDialog">
-        <div class="dialog-content" @click.stop>
-          <div class="dialog-header">
-            <div class="dialog-title">修改密码</div>
-            <div class="dialog-close" @click="closeChangePasswordDialog">×</div>
-          </div>
-          <div class="dialog-body">
-            <div class="form-item">
-              <div class="form-label">当前密码</div>
-              <input type="password" v-model="passwordData.oldPassword" placeholder="请输入当前密码" />
-            </div>
-            <div class="form-item">
-              <div class="form-label">新密码</div>
-              <input type="password" v-model="passwordData.newPassword" placeholder="请输入新密码" />
-            </div>
-            <div class="form-item">
-              <div class="form-label">确认新密码</div>
-              <input type="password" v-model="passwordData.confirmPassword" placeholder="请确认新密码" />
-            </div>
-          </div>
-          <div class="dialog-footer">
+      <view v-if="isChangePasswordDialogVisible" class="dialog-overlay" @click="closeChangePasswordDialog">
+        <view class="dialog-content" @click.stop>
+          <view class="dialog-header">
+            <view class="dialog-title">修改密码</view>
+            <view class="dialog-close" @click="closeChangePasswordDialog">×</view>
+          </view>
+          <view class="dialog-body">
+            <view class="form-item">
+              <view class="form-label">当前密码</view>
+              <input type="password" v-model="passwordData.oldPassword" placeholder="请输入当前密码" class="input-box" />
+            </view>
+            <view class="form-item">
+              <view class="form-label">新密码</view>
+              <input type="password" v-model="passwordData.newPassword" placeholder="请输入新密码" class="input-box" />
+            </view>
+            <view class="form-item">
+              <view class="form-label">确认新密码</view>
+              <input type="password" v-model="passwordData.confirmPassword" placeholder="请确认新密码" class="input-box" />
+            </view>
+          </view>
+          <view class="dialog-footer">
             <button class="dialog-btn cancel-btn" @click="closeChangePasswordDialog">取消</button>
             <button class="dialog-btn confirm-btn" @click="changePassword">确定修改</button>
-          </div>
-        </div>
-      </div>
-    </div>
+          </view>
+        </view>
+      </view>
+    </view>
   </Layout>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import Layout from '../../components/Layout.vue'
+import { useUserStore } from '../../store/user'
 
 const isDeleteDialogVisible = ref(false)
 const isChangePasswordDialogVisible = ref(false)
 const isEditMode = ref(false)
 
-// 用户信息
-const userInfo = reactive({
-  username: 'test',
-  nickname: '测试用户',
-  email: 'test@example.com',
-  phone: '13800138000',
-  avatar: 'https://img.icons8.com/ios-filled/50/000000/user.png'
-})
+// 用户状态管理
+const userStore = useUserStore()
+const userInfo = computed(() => userStore.getUserInfo)
 
 // 表单数据
 const formData = reactive({
@@ -152,15 +137,14 @@ const passwordData = reactive({
   confirmPassword: ''
 })
 
-// 反馈数据
-const feedbackContent = ref('')
-
 // 方法
 const toggleEditMode = () => {
   isEditMode.value = !isEditMode.value
   if (isEditMode.value) {
     // 进入编辑模式时，初始化表单数据
-    Object.assign(formData, userInfo)
+    formData.nickname = userInfo.value.nickname || ''
+    formData.email = userInfo.value.email || ''
+    formData.phone = userInfo.value.phone || ''
   }
 }
 
@@ -170,28 +154,66 @@ const uploadAvatar = () => {
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: (res) => {
-      // 这里可以上传图片到服务器
-      userInfo.avatar = res.tempFilePaths[0]
-      uni.showToast({ title: '头像上传成功', icon: 'success' })
+      // 上传图片到服务器
+      const tempFilePaths = res.tempFilePaths
+      uni.uploadFile({
+        url: '/api/user/avatar',
+        filePath: tempFilePaths[0],
+        name: 'file',
+        header: {
+          'Authorization': `Bearer ${userStore.getToken}`
+        },
+        success: (uploadRes) => {
+          try {
+            const data = JSON.parse(uploadRes.data)
+            if (data.code === 200) {
+              // 更新用户信息
+              const updatedUserInfo = { ...userInfo.value, avatar: data.data }
+              userStore.setUserInfo(updatedUserInfo)
+              uni.showToast({ title: '头像上传成功', icon: 'success' })
+            } else {
+              uni.showToast({ title: data.message || '头像上传失败', icon: 'none' })
+            }
+          } catch (error) {
+            uni.showToast({ title: '头像上传失败', icon: 'none' })
+          }
+        },
+        fail: () => {
+          uni.showToast({ title: '网络错误，头像上传失败', icon: 'none' })
+        }
+      })
     }
   })
 }
 
 const updateProfile = () => {
-  // 这里可以调用API更新用户资料
-  Object.assign(userInfo, formData)
-  uni.showToast({ title: '资料更新成功', icon: 'success' })
-  isEditMode.value = false
-}
-
-const submitFeedback = () => {
-  if (!feedbackContent.value.trim()) {
-    uni.showToast({ title: '请输入反馈内容', icon: 'none' })
-    return
-  }
-  // 这里可以调用API提交反馈
-  uni.showToast({ title: '反馈提交成功', icon: 'success' })
-  feedbackContent.value = ''
+  // 调用API更新用户资料
+  uni.request({
+    url: '/api/user/update',
+    method: 'POST',
+    header: {
+      'Authorization': `Bearer ${userStore.getToken}`
+    },
+    data: {
+      nickname: formData.nickname,
+      email: formData.email,
+      phone: formData.phone
+    },
+    success: (res) => {
+      if (res.data.code === 200) {
+        // 更新本地存储的用户信息
+        const updatedUserInfo = { ...userInfo.value, ...formData }
+        userStore.setUserInfo(updatedUserInfo)
+        uni.showToast({ title: '资料更新成功', icon: 'success' })
+        isEditMode.value = false
+      } else {
+        uni.showToast({ title: res.data.message || '资料更新失败', icon: 'none' })
+      }
+    },
+    fail: () => {
+      uni.showToast({ title: '网络错误，资料更新失败', icon: 'none' })
+    }
+  })
 }
 
 const showDeleteDialog = () => {
@@ -203,14 +225,32 @@ const closeDeleteDialog = () => {
 }
 
 const confirmDeleteAccount = () => {
-  // 这里可以调用API注销账户
-  uni.showToast({ title: '账户注销成功', icon: 'success' })
-  // 跳转到登录页面
-  setTimeout(() => {
-    uni.navigateTo({
-      url: '/pages/login/login'
-    })
-  }, 1500)
+  // 调用API注销账户
+  uni.request({
+    url: '/api/user/delete',
+    method: 'POST',
+    header: {
+      'Authorization': `Bearer ${userStore.getToken}`
+    },
+    success: (res) => {
+      if (res.data.code === 200) {
+        // 清除用户信息
+        userStore.logout()
+        uni.showToast({ title: '账户注销成功', icon: 'success' })
+        // 跳转到登录页面
+        setTimeout(() => {
+          uni.navigateTo({
+            url: '/pages/login/login'
+          })
+        }, 1500)
+      } else {
+        uni.showToast({ title: res.data.message || '账户注销失败', icon: 'none' })
+      }
+    },
+    fail: () => {
+      uni.showToast({ title: '网络错误，账户注销失败', icon: 'none' })
+    }
+  })
 }
 
 const showChangePasswordDialog = () => {
@@ -238,15 +278,59 @@ const changePassword = () => {
     uni.showToast({ title: '两次输入的密码不一致', icon: 'none' })
     return
   }
-  // 这里可以调用API修改密码
-  uni.showToast({ title: '密码修改成功', icon: 'success' })
-  closeChangePasswordDialog()
+  // 调用API修改密码
+  uni.request({
+    url: '/api/user/change-password',
+    method: 'POST',
+    header: {
+      'Authorization': `Bearer ${userStore.getToken}`
+    },
+    data: {
+      oldPassword: passwordData.oldPassword,
+      newPassword: passwordData.newPassword
+    },
+    success: (res) => {
+      if (res.data.code === 200) {
+        uni.showToast({ title: '密码修改成功', icon: 'success' })
+        closeChangePasswordDialog()
+      } else {
+        uni.showToast({ title: res.data.message || '密码修改失败', icon: 'none' })
+      }
+    },
+    fail: () => {
+      uni.showToast({ title: '网络错误，密码修改失败', icon: 'none' })
+    }
+  })
+}
+
+const logout = () => {
+  uni.showModal({
+    title: '退出登录',
+    content: '确定要退出登录吗？',
+    success: (res) => {
+      if (res.confirm) {
+        // 调用用户存储的退出方法
+        userStore.logout()
+        uni.showToast({ title: '退出登录成功', icon: 'success' })
+        // 跳转到登录页面
+        setTimeout(() => {
+          uni.navigateTo({
+            url: '/pages/login/login'
+          })
+        }, 1000)
+      }
+    }
+  })
 }
 
 // 生命周期
 onMounted(() => {
+  // 初始化用户信息
+  userStore.initUserInfo()
   // 初始化表单数据
-  Object.assign(formData, userInfo)
+  formData.nickname = userInfo.value.nickname || ''
+  formData.email = userInfo.value.email || ''
+  formData.phone = userInfo.value.phone || ''
 })
 </script>
 
@@ -298,14 +382,14 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.avatar img {
+.avatar image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: all 0.3s ease;
 }
 
-.avatar:hover img {
+.avatar:hover image {
   transform: scale(1.1);
 }
 
@@ -330,9 +414,13 @@ onMounted(() => {
 }
 
 .icon-camera::before {
-  content: "📷";
-  font-size: 14px;
-  color: white;
+  content: "";
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/ffffff/camera.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .edit-profile-btn {
@@ -368,6 +456,8 @@ onMounted(() => {
   transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
+  min-height: 100px;
+  justify-content: flex-start;
 }
 
 .info-item:hover {
@@ -391,21 +481,27 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-.info-item input {
+.info-item .input-box {
   width: 100%;
-  padding: 14px 16px;
+  padding: 16px;
   border: 2px solid var(--primary-color);
   border-radius: 8px;
   background-color: white;
-  font-size: 18px;
+  font-size: 16px;
   color: var(--text-color);
   font-weight: 500;
   margin-top: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+  pointer-events: auto;
+  cursor: text;
+  box-sizing: border-box;
+  line-height: 1.6;
+  min-height: 60px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
-.info-item input:focus {
+.info-item .input-box:focus {
   outline: none;
   border-color: var(--secondary-color);
   box-shadow: 0 0 0 3px rgba(148, 167, 200, 0.1);
@@ -450,11 +546,48 @@ input, textarea {
   background-color: white;
   font-size: 14px;
   color: var(--text-color);
+  box-sizing: border-box;
+  line-height: 1.6;
+  min-height: 60px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 textarea {
   resize: none;
   min-height: 100px;
+}
+
+/* uni-app 输入框样式 */
+.input-box {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #E8E1D6;
+  border-radius: 8px;
+  background-color: white;
+  font-size: 18px;
+  color: var(--text-color);
+  box-sizing: border-box;
+}
+
+.input-box:focus {
+  border-color: var(--primary-color);
+}
+
+.textarea-box {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #E8E1D6;
+  border-radius: 8px;
+  background-color: white;
+  font-size: 16px;
+  color: var(--text-color);
+  box-sizing: border-box;
+  min-height: 120px;
+  resize: none;
+}
+
+.textarea-box:focus {
+  border-color: var(--primary-color);
 }
 
 .submit-btn {
@@ -514,20 +647,63 @@ textarea {
   margin-right: 12px;
   font-size: 20px;
   color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  min-height: 20px;
 }
 
 .icon-lock::before {
-  content: "🔒";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/lock--v1.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .icon-close-circle {
   margin-right: 12px;
   font-size: 20px;
   color: #ff4d4f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  min-height: 20px;
 }
 
 .icon-close-circle::before {
-  content: "❌";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/ff4d4f/close-window.png);
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.icon-logout {
+  margin-right: 12px;
+  font-size: 20px;
+  color: #ff4d4f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+.icon-logout::before {
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/ff4d4f/logout-rounded-left.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .action-text {

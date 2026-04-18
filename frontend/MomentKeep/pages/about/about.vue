@@ -82,6 +82,10 @@
             <span class="tech-name">AI</span>
             <span class="tech-value">DeepSeek API</span>
           </div>
+          <div class="tech-item">
+            <span class="tech-name">部署</span>
+            <span class="tech-value">Docker + Nginx</span>
+          </div>
         </div>
       </div>
       
@@ -214,23 +218,43 @@ onMounted(() => {
 }
 
 .clock-icon::before {
-  content: "🕒";
-  color: #C2977F;
+  content: "";
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/color/48/000000/clock.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .todo-icon::before {
-  content: "✅";
-  color: #94A7C8;
+  content: "";
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/color/48/000000/todo-list.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .time-icon::before {
-  content: "⏰";
-  color: #D8C8BE;
+  content: "";
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/color/48/000000/hourglass.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .chat-icon::before {
-  content: "💬";
-  color: #C2977F;
+  content: "";
+  width: 24px;
+  height: 24px;
+  display: block;
+  background-image: url(https://img.icons8.com/color/48/000000/chat.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .feature-text {

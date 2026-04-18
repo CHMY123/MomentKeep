@@ -1,5 +1,8 @@
 <template>
   <div class="layout-container">
+    <!-- 背景层 -->
+    <div class="background-layer" :style="currentBackgroundStyle"></div>
+    
     <!-- 侧边栏遮罩层 -->
     <div 
       v-if="isMobile && isSidebarOpen" 
@@ -64,13 +67,16 @@
       </div>
       <div class="ai-content">
         <div class="ai-message ai-message-bot">
-          <div class="ai-avatar">AI</div>
+          <div class="ai-avatar"></div>
           <div class="ai-message-content">
             <span>你好！我是你的AI助手，有什么可以帮助你的吗？</span>
           </div>
         </div>
         <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.type === 'user' ? 'ai-message-user' : 'ai-message-bot'">
-          <div class="ai-avatar">{{ message.type === 'user' ? '我' : 'AI' }}</div>
+          <div v-if="message.type === 'user'" class="ai-avatar">
+            <img :src="userAvatar" alt="user avatar" />
+          </div>
+          <div v-else class="ai-avatar"></div>
           <div class="ai-message-content">
             <span>{{ message.content }}</span>
           </div>
@@ -86,17 +92,56 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useUserStore } from '../store/user'
+import { useAppStore } from '../store/app'
 
-// 状态管理
+const userStore = useUserStore()
+const appStore = useAppStore()
+
 const isSidebarOpen = ref(true)
 const isAIChatOpen = ref(false)
-const activeMenu = ref('home')
-const userAvatar = ref('https://img.icons8.com/ios-filled/50/000000/user.png')
-const userName = ref('用户')
 const aiMessages = ref([])
 const aiInput = ref('')
 const currentPageTitle = ref('朝暮记')
 const isMobile = ref(false)
+
+const activeMenu = computed(() => appStore.activeMenu)
+
+const themeBackgrounds = [
+  { name: '雾感森林', image: '/static/background/Misty Forest.jpg' },
+  { name: '简约线条', image: '/static/background/minimalist lines.png' },
+  { name: '温柔肌理', image: '/static/background/gentle texture.jpg' }
+]
+
+const currentBackgroundStyle = ref({})
+
+const updateBackgroundStyle = () => {
+  const backgroundImage = localStorage.getItem('backgroundImage')
+  const selectedTheme = localStorage.getItem('selectedTheme')
+
+  let bgImage = ''
+  if (backgroundImage) {
+    bgImage = backgroundImage
+  } else if (selectedTheme !== null && parseInt(selectedTheme) >= 0 && parseInt(selectedTheme) < themeBackgrounds.length) {
+    bgImage = themeBackgrounds[parseInt(selectedTheme)].image
+  }
+
+  if (bgImage) {
+    currentBackgroundStyle.value = {
+      backgroundImage: `url(${bgImage})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat'
+    }
+  } else {
+    currentBackgroundStyle.value = {}
+  }
+}
+
+updateBackgroundStyle()
+
+const userAvatar = computed(() => userStore.getUserInfo.avatar || 'https://img.icons8.com/ios-filled/50/000000/user.png')
+const userName = computed(() => userStore.getUserInfo.nickname || userStore.getUserInfo.username || '用户')
 
 // 菜单配置
 const menuItems = [
@@ -128,15 +173,17 @@ const toggleSidebar = () => {
 
 const toggleAIChat = () => {
   isAIChatOpen.value = !isAIChatOpen.value
+  if (isAIChatOpen.value && userStore.getToken) {
+    loadChatHistory()
+  }
 }
 
 const navigateTo = (path, menuId) => {
+  appStore.setActiveMenu(menuId)
   uni.navigateTo({
     url: `/${path}`
   })
-  activeMenu.value = menuId
-  // 在移动端自动关闭侧边栏
-  if (window.innerWidth < 768) {
+  if (isMobile.value) {
     isSidebarOpen.value = false
   }
 }
@@ -151,14 +198,62 @@ const navigateToProfile = () => {
   }
 }
 
-const sendAIMessage = () => {
-  if (aiInput.value.trim()) {
-    aiMessages.value.push({ type: 'user', content: aiInput.value })
-    // 模拟AI回复
-    setTimeout(() => {
-      aiMessages.value.push({ type: 'bot', content: '这是一条模拟的AI回复' })
-    }, 1000)
+const sendAIMessage = async () => {
+  if (aiInput.value.trim() && userStore.getToken) {
+    const userMessage = aiInput.value.trim()
+    aiMessages.value.push({ type: 'user', content: userMessage })
     aiInput.value = ''
+
+    try {
+      const response = await uni.request({
+        url: '/api/ai/chat',
+        method: 'POST',
+        header: {
+          'Authorization': `Bearer ${userStore.getToken}`,
+          'Content-Type': 'application/json'
+        },
+        data: { message: userMessage }
+      })
+
+      if (response.statusCode === 200 && response.data.code === 200) {
+        aiMessages.value.push({ type: 'bot', content: response.data.data })
+      } else {
+        aiMessages.value.push({ type: 'bot', content: '抱歉，AI助手暂时无法回复。' })
+      }
+    } catch (error) {
+      console.error('AI chat error:', error)
+      aiMessages.value.push({ type: 'bot', content: '网络错误，请稍后再试。' })
+    }
+  } else if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+  }
+}
+
+const loadChatHistory = async () => {
+  if (!userStore.getToken) return
+
+  try {
+    const response = await uni.request({
+      url: '/api/ai/history',
+      method: 'GET',
+      header: {
+        'Authorization': `Bearer ${userStore.getToken}`
+      }
+    })
+
+    if (response.statusCode === 200 && response.data.code === 200 && response.data.data) {
+      const history = response.data.data
+      aiMessages.value = []
+      for (const msg of history) {
+        if (msg.role === 'user') {
+          aiMessages.value.push({ type: 'user', content: msg.content })
+        } else if (msg.role === 'assistant') {
+          aiMessages.value.push({ type: 'bot', content: msg.content })
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Load chat history error:', error)
   }
 }
 
@@ -173,42 +268,83 @@ const checkMobile = () => {
   }
 }
 
+// 处理背景更新事件
+const handleBackgroundUpdate = (event) => {
+  const { type, image, selectedTheme } = event.detail
+  if (type === 'theme' && image) {
+    currentBackgroundStyle.value = {
+      backgroundImage: `url(${image})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat'
+    }
+    localStorage.setItem('selectedTheme', selectedTheme.toString())
+    localStorage.removeItem('backgroundImage')
+  } else if (type === 'custom' && image) {
+    currentBackgroundStyle.value = {
+      backgroundImage: `url(${image})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat'
+    }
+    localStorage.setItem('backgroundImage', image)
+    localStorage.setItem('selectedTheme', '-1')
+  }
+}
+
 // 生命周期
-onMounted(() => {
-  // 初始化用户信息
-  // 这里可以从本地存储或API获取用户信息
-  userName.value = '测试用户'
-  
-  // 检测是否为移动端
+onMounted(async () => {
+  updateBackgroundStyle()
+  userStore.initUserInfo()
+
+  if (userStore.getToken) {
+    try {
+      const response = await uni.request({
+        url: '/api/user/profile',
+        header: {
+          'Authorization': `Bearer ${userStore.getToken}`
+        }
+      })
+      if (response.statusCode === 200 && response.data.code === 200) {
+        const profile = response.data.data
+        userStore.setUserInfo(profile)
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+    }
+  }
+
   checkMobile()
-  
-  // 监听窗口大小变化
+  updateActiveMenu() // 直接调用，不延迟
+
   window.addEventListener('resize', checkMobile)
-  
+  window.addEventListener('background-updated', handleBackgroundUpdate)
+})
+
+const updateActiveMenu = () => {
   try {
-    // 获取当前页面路径
     const pages = getCurrentPages()
     if (pages && pages.length > 0) {
       const currentPage = pages[pages.length - 1]
       if (currentPage && currentPage.route) {
         const currentPath = currentPage.route
-        
-        // 设置当前页面标题
+
         const menuItem = menuItems.find(item => item.path === currentPath)
         if (menuItem) {
           currentPageTitle.value = menuItem.name
-          activeMenu.value = menuItem.id
+          appStore.setActiveMenu(menuItem.id)
         }
       }
     }
   } catch (error) {
     console.error('获取当前页面路径失败:', error)
   }
-})
+}
 
 onUnmounted(() => {
   // 移除窗口大小监听
   window.removeEventListener('resize', checkMobile)
+  window.removeEventListener('background-updated', handleBackgroundUpdate)
 })
 </script>
 
@@ -217,10 +353,37 @@ onUnmounted(() => {
 .layout-container {
   display: flex;
   height: 100vh;
-  background-color: var(--bg-color);
   position: relative;
   color: var(--text-color);
   transition: all 0.3s ease;
+  overflow: hidden;
+  background-color: var(--bg-color);
+}
+
+/* 背景层 */
+.background-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  filter: blur(8px);
+  transition: background-image 0.3s ease, opacity 0.3s ease;
+  background-color: var(--bg-color);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* 确保内容层在背景之上 */
+.sidebar,
+.main-content,
+.sidebar-overlay,
+.floating-toggle-btn,
+.ai-sidebar {
+  position: relative;
+  z-index: 1;
 }
 
 /* 侧边栏遮罩层 */
@@ -238,10 +401,11 @@ onUnmounted(() => {
 /* 侧边栏样式 */
 .sidebar {
   width: 240px;
-  background-color: var(--sidebar-bg, var(--bg-color));
+  background: rgba(242, 238, 232, 0.8);
+  backdrop-filter: blur(10px);
   box-shadow: 1px 0 4px rgba(0, 0, 0, 0.1);
   border-right: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
-  transition: transform 0.3s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   display: flex;
   flex-direction: column;
   padding-top: 20px;
@@ -400,37 +564,84 @@ onUnmounted(() => {
 
 /* 图标样式 */
 .icon-home::before {
-  content: "🏠";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/home.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .icon-clock::before {
-  content: "🕒";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/clock.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .icon-todo::before {
-  content: "✅";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/checkmark--v1.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .icon-time::before {
-  content: "⏰";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/alarm-clock.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .icon-settings::before {
-  content: "⚙️";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/settings.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .icon-info::before {
-  content: "ℹ️";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/info.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .icon-default::before {
-  content: "📋";
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/list.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 /* 侧边栏图标 */
 .sidebar-icon::before {
-  content: "☰";
-  font-size: 24px;
+  content: "";
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/menu.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 /* 聊天图标 */
@@ -444,7 +655,13 @@ onUnmounted(() => {
 }
 
 .chat-icon::before {
-  content: "💬";
+  content: "";
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/chat.png);
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 .menu-text-active {
@@ -458,7 +675,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
-  background-color: var(--bg-color);
+  background: transparent;
   color: var(--text-color);
 }
 
@@ -467,7 +684,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   padding: 0 20px;
-  background-color: var(--bg-color);
+  background: rgba(242, 238, 232, 0.8);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   position: sticky;
   top: 0;
@@ -503,7 +721,8 @@ onUnmounted(() => {
   top: 0;
   width: 300px;
   height: 100vh;
-  background-color: var(--bg-color);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
   box-shadow: -1px 0 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
   display: flex;
@@ -569,6 +788,34 @@ onUnmounted(() => {
   margin: 0 8px;
 }
 
+.ai-message-bot .ai-avatar {
+  background-color: var(--secondary-color);
+  background-image: url('/static/avatar/AI assistant.png');
+  background-size: cover;
+  background-position: center;
+  border-radius: 50%;
+}
+
+.ai-message-bot .ai-avatar::before {
+  display: none;
+}
+
+.ai-message-bot .ai-avatar::after {
+  display: none;
+}
+
+.ai-message-user .ai-avatar {
+  background-color: var(--primary-color);
+  overflow: hidden;
+}
+
+.ai-message-user .ai-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .ai-message-content {
   flex: 1;
   max-width: 70%;
@@ -588,28 +835,44 @@ onUnmounted(() => {
   padding: 16px;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
+  align-items: center;
   gap: 10px;
+  min-height: 64px;
+  box-sizing: border-box;
 }
 
 .ai-input input {
   flex: 1;
-  padding: 10px 14px;
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
   border: 1px solid #D8C8BE;
-  border-radius: 20px;
+  border-radius: 22px;
   background-color: white;
   font-size: 14px;
   color: var(--text-color);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ai-input input:focus {
+  border-color: var(--primary-color);
 }
 
 .ai-input button {
-  padding: 0 16px;
+  flex-shrink: 0;
+  height: 44px;
+  padding: 0 20px;
   background-color: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 20px;
+  border-radius: 22px;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ai-input button:hover {

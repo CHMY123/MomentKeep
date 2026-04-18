@@ -15,21 +15,21 @@
       <!-- 待办列表 -->
       <div class="todo-list">
         <div 
-          v-for="(todo, index) in todos" 
-          :key="index"
+          v-for="todo in todos" 
+          :key="todo.id"
           class="todo-item"
           :class="{ 'completed': todo.completed }"
         >
           <div class="todo-content">
-            <div class="todo-icon" :class="{ 'completed': todo.completed }" @click="toggleTodo(index)"></div>
+            <div class="todo-icon" :class="{ 'completed': todo.completed }" @click="toggleTodo(todo.id)"></div>
             <div class="todo-text">
               <span :class="{ 'completed-text': todo.completed }">{{ todo.title }}</span>
               <span v-if="todo.description" class="todo-description">{{ todo.description }}</span>
             </div>
           </div>
           <div class="todo-actions">
-            <div class="action-icon edit-icon" @click="editTodo(index)"></div>
-            <div class="action-icon delete-icon" @click="deleteTodo(index)"></div>
+            <div class="action-icon edit-icon" @click="editTodo(todo)"></div>
+            <div class="action-icon delete-icon" @click="deleteTodo(todo.id)"></div>
           </div>
         </div>
         <div v-if="todos.length === 0" class="empty-todo">
@@ -76,40 +76,32 @@
 </template>
 
 <script setup>
+/**
+ * MomentKeep 朝暮记 - 今日待办页面
+ * @description 管理用户待办事项，支持添加、编辑、完成、删除操作
+ * @author MomentKeep Team
+ * @since 2026-04-18
+ */
 import { ref, reactive, onMounted } from 'vue'
 import Layout from '../../components/Layout.vue'
+import { useUserStore } from '../../store/user'
+import { useCache } from '../../utils/cache'
 
-// 待办数据
-const todos = ref([
-  {
-    title: '完成前端开发',
-    description: '实现所有页面的UI和交互',
-    completed: false,
-    completionNote: ''
-  },
-  {
-    title: '测试API接口',
-    description: '确保所有接口正常工作',
-    completed: false,
-    completionNote: ''
-  },
-  {
-    title: '提交代码',
-    description: '将代码提交到版本控制系统',
-    completed: false,
-    completionNote: ''
-  }
-])
+const userStore = useUserStore()
+const { getCache, setCache, removeCache, fetchWithCache } = useCache()
 
-// 新待办
+// 待办数据列表
+const todos = ref([])
+
+// 新待办表单数据
 const newTodo = reactive({
   title: '',
   description: ''
 })
 
-// 编辑待办
+// 编辑待办表单数据
 const editTodoForm = reactive({
-  index: -1,
+  id: null,
   title: '',
   description: ''
 })
@@ -120,75 +112,322 @@ const completionNote = ref('')
 // 弹窗状态
 const isEditDialogOpen = ref(false)
 const isCompleteDialogOpen = ref(false)
+const completingTodoId = ref(null)
 
-// 方法
-const addTodo = () => {
-  if (newTodo.title.trim()) {
-    todos.value.push({
-      title: newTodo.title,
-      description: newTodo.description,
-      completed: false,
-      completionNote: ''
+// 加载状态
+const loading = ref(false)
+
+/**
+ * 获取待办列表
+ * @description 从API获取待办数据，支持缓存优先策略
+ */
+const fetchTodos = async () => {
+  const fetchFn = async () => {
+    if (!userStore.getToken) {
+      return []
+    }
+
+    const response = await uni.request({
+      url: '/api/todo',
+      header: {
+        'Authorization': `Bearer ${userStore.getToken}`
+      }
     })
-    newTodo.title = ''
-    newTodo.description = ''
-    // 这里可以调用API保存待办
-    uni.showToast({ title: '待办添加成功', icon: 'success' })
+
+    if (response.statusCode === 200 && response.data.code === 200) {
+      return response.data.data || []
+    }
+    return []
+  }
+
+  try {
+    loading.value = true
+    const cachedTodos = getCache('todos')
+    if (cachedTodos !== null) {
+      todos.value = cachedTodos
+    }
+    const data = await fetchWithCache('todos', fetchFn)
+    todos.value = data
+  } catch (error) {
+    console.error('Error:', error)
+    uni.showToast({ title: '网络错误', icon: 'none' })
+  } finally {
+    loading.value = false
   }
 }
 
-const toggleTodo = (index) => {
-  const todo = todos.value[index]
+/**
+ * 添加新待办
+ */
+const addTodo = async () => {
+  if (newTodo.title.trim()) {
+    if (!userStore.getToken) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/login/login' })
+      }, 1000)
+      return
+    }
+
+    try {
+      const response = await uni.request({
+        url: '/api/todo',
+        method: 'POST',
+        header: {
+          'Authorization': `Bearer ${userStore.getToken}`,
+          'Content-Type': 'application/json'
+        },
+        data: {
+          title: newTodo.title,
+          description: newTodo.description,
+          todoDate: new Date().toISOString().split('T')[0],
+          userId: 1
+        }
+      })
+
+      if (response.statusCode === 200 && response.data.code === 200) {
+        todos.value.push(response.data.data)
+        newTodo.title = ''
+        newTodo.description = ''
+        uni.showToast({ title: '待办添加成功', icon: 'success' })
+      } else if (response.statusCode === 403) {
+        uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+        setTimeout(() => {
+          uni.navigateTo({ url: '/pages/login/login' })
+        }, 1000)
+      } else {
+        uni.showToast({ title: '添加失败', icon: 'none' })
+      }
+    } catch (error) {
+      uni.showToast({ title: '网络错误', icon: 'none' })
+    }
+  }
+}
+
+/**
+ * 切换待办完成状态
+ * @param {number} id - 待办ID
+ */
+const toggleTodo = (id) => {
+  if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }, 1000)
+    return
+  }
+
+  const todo = todos.value.find(t => t.id === id)
   if (!todo.completed) {
-    // 显示完成弹窗
     completionNote.value = ''
-    editTodoForm.index = index
+    completingTodoId.value = id
     isCompleteDialogOpen.value = true
   } else {
-    // 取消完成
-    todo.completed = false
-    todo.completionNote = ''
-    // 这里可以调用API更新待办
+    updateTodoStatus(id, false)
   }
 }
 
-const confirmCompleteTodo = () => {
-  const todo = todos.value[editTodoForm.index]
-  todo.completed = true
-  todo.completionNote = completionNote.value
-  closeCompleteDialog()
-  // 这里可以调用API更新待办
-  uni.showToast({ title: '待办完成', icon: 'success' })
+/**
+ * 确认完成待办
+ */
+const confirmCompleteTodo = async () => {
+  if (completingTodoId.value) {
+    if (!userStore.getToken) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/login/login' })
+      }, 1000)
+      return
+    }
+
+    try {
+      const response = await uni.request({
+        url: `/api/todo/${completingTodoId.value}/complete`,
+        method: 'POST',
+        header: {
+          'Authorization': `Bearer ${userStore.getToken}`
+        },
+        data: {
+          completionNote: completionNote.value
+        }
+      })
+
+      if (response.statusCode === 200 && response.data.code === 200) {
+        const index = todos.value.findIndex(t => t.id === completingTodoId.value)
+        if (index !== -1) {
+          todos.value[index] = response.data.data
+        }
+        closeCompleteDialog()
+        uni.showToast({ title: '待办完成', icon: 'success' })
+      } else if (response.statusCode === 403) {
+        uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+        setTimeout(() => {
+          uni.navigateTo({ url: '/pages/login/login' })
+        }, 1000)
+      } else {
+        uni.showToast({ title: '操作失败', icon: 'none' })
+      }
+    } catch (error) {
+      uni.showToast({ title: '网络错误', icon: 'none' })
+    }
+  }
 }
 
-const editTodo = (index) => {
-  const todo = todos.value[index]
-  editTodoForm.index = index
+/**
+ * 更新待办状态
+ * @param {number} id - 待办ID
+ * @param {boolean} completed - 是否完成
+ */
+const updateTodoStatus = async (id, completed) => {
+  if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }, 1000)
+    return
+  }
+
+  try {
+    const response = await uni.request({
+      url: '/api/todo',
+      method: 'PUT',
+      header: {
+        'Authorization': `Bearer ${userStore.getToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        id: id,
+        completed: completed
+      }
+    })
+
+    if (response.statusCode === 200 && response.data.code === 200) {
+      const index = todos.value.findIndex(t => t.id === id)
+      if (index !== -1) {
+        todos.value[index].completed = completed
+      }
+    } else if (response.statusCode === 403) {
+      uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/login/login' })
+      }, 1000)
+    } else {
+      uni.showToast({ title: '更新失败', icon: 'none' })
+    }
+  } catch (error) {
+    uni.showToast({ title: '网络错误', icon: 'none' })
+  }
+}
+
+/**
+ * 编辑待办
+ * @param {Object} todo - 待办对象
+ */
+const editTodo = (todo) => {
+  if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }, 1000)
+    return
+  }
+
+  editTodoForm.id = todo.id
   editTodoForm.title = todo.title
   editTodoForm.description = todo.description
   isEditDialogOpen.value = true
 }
 
-const saveTodo = () => {
+/**
+ * 保存编辑后的待办
+ */
+const saveTodo = async () => {
   if (editTodoForm.title.trim()) {
-    const todo = todos.value[editTodoForm.index]
-    todo.title = editTodoForm.title
-    todo.description = editTodoForm.description
-    closeEditDialog()
-    // 这里可以调用API更新待办
-    uni.showToast({ title: '待办更新成功', icon: 'success' })
+    if (!userStore.getToken) {
+      uni.showToast({ title: '请先登录', icon: 'none' })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/login/login' })
+      }, 1000)
+      return
+    }
+
+    try {
+      const response = await uni.request({
+        url: '/api/todo',
+        method: 'PUT',
+        header: {
+          'Authorization': `Bearer ${userStore.getToken}`,
+          'Content-Type': 'application/json'
+        },
+        data: {
+          id: editTodoForm.id,
+          title: editTodoForm.title,
+          description: editTodoForm.description
+        }
+      })
+
+      if (response.statusCode === 200 && response.data.code === 200) {
+        const index = todos.value.findIndex(t => t.id === editTodoForm.id)
+        if (index !== -1) {
+          todos.value[index] = response.data.data
+        }
+        closeEditDialog()
+        uni.showToast({ title: '待办更新成功', icon: 'success' })
+      } else if (response.statusCode === 403) {
+        uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+        setTimeout(() => {
+          uni.navigateTo({ url: '/pages/login/login' })
+        }, 1000)
+      } else {
+        uni.showToast({ title: '更新失败', icon: 'none' })
+      }
+    } catch (error) {
+      uni.showToast({ title: '网络错误', icon: 'none' })
+    }
   }
 }
 
-const deleteTodo = (index) => {
+const deleteTodo = (id) => {
+  // 检查是否有 token
+  if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }, 1000)
+    return
+  }
+  
   uni.showModal({
     title: '确认删除',
     content: '确定要删除这个待办吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        todos.value.splice(index, 1)
-        // 这里可以调用API删除待办
-        uni.showToast({ title: '待办删除成功', icon: 'success' })
+        try {
+          const response = await uni.request({
+            url: `/api/todo/${id}`,
+            method: 'DELETE',
+            header: {
+              'Authorization': `Bearer ${userStore.getToken}`
+            }
+          })
+          
+          if (response.statusCode === 200 && response.data.code === 200) {
+            const index = todos.value.findIndex(t => t.id === id)
+            if (index !== -1) {
+              todos.value.splice(index, 1)
+            }
+            uni.showToast({ title: '待办删除成功', icon: 'success' })
+          } else if (response.statusCode === 403) {
+            uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+            setTimeout(() => {
+              uni.navigateTo({ url: '/pages/login/login' })
+            }, 1000)
+          } else {
+            uni.showToast({ title: '删除失败', icon: 'none' })
+          }
+        } catch (error) {
+          uni.showToast({ title: '网络错误', icon: 'none' })
+        }
       }
     }
   })
@@ -196,7 +435,7 @@ const deleteTodo = (index) => {
 
 const closeEditDialog = () => {
   isEditDialogOpen.value = false
-  editTodoForm.index = -1
+  editTodoForm.id = null
   editTodoForm.title = ''
   editTodoForm.description = ''
 }
@@ -204,12 +443,16 @@ const closeEditDialog = () => {
 const closeCompleteDialog = () => {
   isCompleteDialogOpen.value = false
   completionNote.value = ''
+  completingTodoId.value = null
 }
 
 // 生命周期
 onMounted(() => {
+  // 初始化用户信息
+  userStore.initUserInfo()
+  
   // 初始化数据
-  // 这里可以从API获取实际待办数据
+  fetchTodos()
   
   // 检查是否是今天第一次进入
   const today = new Date().toDateString()
@@ -219,9 +462,29 @@ onMounted(() => {
     uni.showModal({
       title: '提示',
       content: '是否保留昨天的待办到今天？',
-      success: (res) => {
-        if (res.confirm) {
+      success: async (res) => {
+        if (res.confirm && userStore.getToken) {
           // 保留昨天的待办
+          try {
+            const response = await uni.request({
+              url: '/api/todo/copy-yesterday',
+              method: 'POST',
+              header: {
+                'Authorization': `Bearer ${userStore.getToken}`
+              }
+            })
+            
+            if (response.statusCode === 200 && response.data.code === 200) {
+              uni.showToast({ title: '已保留昨天的待办', icon: 'success' })
+              // 重新加载待办列表
+              await fetchTodos()
+            } else {
+              uni.showToast({ title: '保留待办失败', icon: 'none' })
+            }
+          } catch (error) {
+            console.error('复制昨天待办失败:', error)
+            uni.showToast({ title: '网络错误', icon: 'none' })
+          }
         }
       }
     })
@@ -250,10 +513,14 @@ onMounted(() => {
   background-color: white;
   font-size: 14px;
   color: #333333;
+  box-sizing: border-box;
+  line-height: 1.6;
+  min-height: 60px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 .add-btn {
-  padding: 0 20px;
+  padding: 12px 20px;
   background-color: #C2977F;
   color: white;
   border: none;
@@ -261,6 +528,9 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 500;
   transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .add-btn:hover {
@@ -459,6 +729,9 @@ onMounted(() => {
   font-size: 14px;
   margin-bottom: 12px;
   box-sizing: border-box;
+  line-height: 1.6;
+  min-height: 60px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 .modal-body textarea {

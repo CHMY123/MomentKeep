@@ -10,16 +10,16 @@
       <!-- 倒计时列表 -->
       <div class="countdown-list">
         <div 
-          v-for="(countdown, index) in countdowns" 
-          :key="index"
+          v-for="countdown in countdowns" 
+          :key="countdown.id"
           class="countdown-card"
           :style="{ borderLeftColor: countdown.color }"
         >
           <div class="countdown-header">
             <span class="countdown-title">{{ countdown.title }}</span>
             <div class="countdown-actions">
-              <div class="action-icon edit-icon" @click="editCountdown(index)"></div>
-              <div class="action-icon delete-icon" @click="deleteCountdown(index)"></div>
+              <div class="action-icon edit-icon" @click="editCountdown(countdown)"></div>
+              <div class="action-icon delete-icon" @click="deleteCountdown(countdown.id)"></div>
             </div>
           </div>
           <div class="countdown-time">
@@ -36,8 +36,11 @@
               <span class="time-unit">分</span>
             </div>
           </div>
+          <div class="countdown-status" v-if="countdown.isPast">
+            已过去
+          </div>
           <div class="countdown-info">
-            <span class="countdown-date">{{ countdown.date }}</span>
+            <span class="countdown-date">{{ formatDate(countdown.targetTime) }}</span>
             <span v-if="countdown.description" class="countdown-description">{{ countdown.description }}</span>
           </div>
         </div>
@@ -56,8 +59,20 @@
           <div class="modal-body">
             <input type="text" v-model="formData.title" placeholder="输入标题" />
             <textarea v-model="formData.description" placeholder="输入描述（可选）" rows="3" />
-            <input type="date" v-model="formData.date" placeholder="选择日期" />
-            <input type="time" v-model="formData.time" placeholder="选择时间" />
+            <div class="date-picker">
+              <select v-model="formData.year" @change="updateDayOptions">
+                <option v-for="year in years" :key="year" :value="year">{{ year }}</option>
+              </select>
+              <span>年</span>
+              <select v-model="formData.month" @change="updateDayOptions">
+                <option v-for="month in 12" :key="month" :value="month">{{ month }}</option>
+              </select>
+              <span>月</span>
+              <select v-model="formData.day">
+                <option v-for="day in dayOptions" :key="day" :value="day">{{ day }}</option>
+              </select>
+              <span>日</span>
+            </div>
             <div class="color-picker">
               <label class="color-label">选择颜色</label>
               <div class="color-options">
@@ -83,140 +98,345 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import Layout from '../../components/Layout.vue'
+import { useUserStore } from '../../store/user'
+import { useCache } from '../../utils/cache'
+
+const userStore = useUserStore()
+const { getCache, setCache, removeCache, fetchWithCache } = useCache()
 
 // 倒计时数据
-const countdowns = ref([
-  {
-    title: '生日',
-    description: '我的生日',
-    date: '2026-04-23',
-    time: '12:00',
-    color: '#C2977F',
-    days: 10,
-    hours: 0,
-    minutes: 0
-  },
-  {
-    title: '旅行',
-    description: '去海边旅行',
-    date: '2026-05-13',
-    time: '08:00',
-    color: '#94A7C8',
-    days: 30,
-    hours: 0,
-    minutes: 0
-  },
-  {
-    title: '考试',
-    description: '期末考试',
-    date: '2026-06-13',
-    time: '09:00',
-    color: '#D8C8BE',
-    days: 60,
-    hours: 0,
-    minutes: 0
-  }
-])
+const countdowns = ref([])
 
 // 表单数据
 const formData = reactive({
+  id: null,
   title: '',
   description: '',
-  date: '',
-  time: '',
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1,
+  day: new Date().getDate(),
   color: '#C2977F'
 })
 
 // 弹窗状态
 const isDialogOpen = ref(false)
 const isEdit = ref(false)
-const editIndex = ref(-1)
 
 // 颜色选项
 const colorOptions = ['#C2977F', '#94A7C8', '#D8C8BE', '#333333', '#4A5568', '#718096']
 
-// 弹窗引用
-const countdownDialog = ref(null)
+// 年份范围 1978-2035
+const years = []
+for (let i = 1978; i <= 2035; i++) {
+  years.push(i)
+}
+
+// 日期选项
+const dayOptions = ref([])
+
+// 更新日期选项
+const updateDayOptions = () => {
+  const year = formData.year
+  const month = formData.month
+  
+  // 默认显示31天
+  let days = 31
+  
+  // 处理大小月
+  if ([4, 6, 9, 11].includes(month)) {
+    days = 30
+  } else if (month === 2) {
+    // 处理闰年
+    if ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) {
+      days = 29
+    } else {
+      days = 28
+    }
+  }
+  
+  const options = []
+  for (let i = 1; i <= days; i++) {
+    options.push(i)
+  }
+  
+  dayOptions.value = options
+  
+  // 确保选中的日期有效
+  if (formData.day > days) {
+    formData.day = days
+  }
+}
+
+// 初始化日期选项
+updateDayOptions()
 
 // 定时器
 let timer = null
 
+// 加载状态
+const loading = ref(false)
+
+// 格式化日期
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 计算倒计时
+const calculateTimeLeft = (targetTime) => {
+  const target = new Date(targetTime)
+  const now = new Date()
+  const diff = target - now
+  
+  const absDiff = Math.abs(diff)
+  const days = Math.floor(absDiff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((absDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60))
+  
+  return { days, hours, minutes, isPast: diff <= 0 }
+}
+
+// 获取倒计时列表
+const fetchCountdowns = async () => {
+  const fetchFn = async () => {
+    if (!userStore.getToken) {
+      return []
+    }
+
+    const response = await uni.request({
+      url: '/api/countdown',
+      header: {
+        'Authorization': `Bearer ${userStore.getToken}`
+      }
+    })
+
+    if (response.statusCode === 200 && response.data.code === 200) {
+      const data = response.data.data || []
+      return data.map(countdown => {
+        const timeLeft = calculateTimeLeft(countdown.targetTime)
+        return {
+          ...countdown,
+          days: timeLeft.days,
+          hours: timeLeft.hours,
+          minutes: timeLeft.minutes,
+          isPast: timeLeft.isPast
+        }
+      })
+    }
+    return []
+  }
+
+  try {
+    loading.value = true
+    const cachedData = getCache('countdowns_detail')
+    if (cachedData !== null) {
+      countdowns.value = cachedData
+    }
+    const data = await fetchWithCache('countdowns_detail', fetchFn)
+    countdowns.value = data
+  } catch (error) {
+    uni.showToast({ title: '网络错误', icon: 'none' })
+  } finally {
+    loading.value = false
+  }
+}
+
 // 方法
 const showAddDialog = () => {
   isEdit.value = false
-  editIndex.value = -1
+  formData.id = null
   formData.title = ''
   formData.description = ''
-  formData.date = ''
-  formData.time = ''
+  formData.year = new Date().getFullYear()
+  formData.month = new Date().getMonth() + 1
+  formData.day = new Date().getDate()
   formData.color = '#C2977F'
+  
+  // 更新日期选项
+  updateDayOptions()
+  
   isDialogOpen.value = true
 }
 
-const editCountdown = (index) => {
+
+
+const editCountdown = (countdown) => {
   isEdit.value = true
-  editIndex.value = index
-  const countdown = countdowns.value[index]
+  formData.id = countdown.id
   formData.title = countdown.title
   formData.description = countdown.description
-  formData.date = countdown.date
-  formData.time = countdown.time
+  
+  const targetDate = new Date(countdown.targetTime)
+  formData.year = targetDate.getFullYear()
+  formData.month = targetDate.getMonth() + 1
+  formData.day = targetDate.getDate()
+  
+  // 更新日期选项
+  updateDayOptions()
+  
   formData.color = countdown.color
   isDialogOpen.value = true
 }
 
-const saveCountdown = () => {
-  if (!formData.title.trim() || !formData.date) {
+// 保存倒计时的核心逻辑
+const saveCountdownWithTargetDate = async (targetDate) => {
+  // 检查是否有 token
+  if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }, 1000)
+    return
+  }
+  
+  try {
+    const url = isEdit.value ? '/api/countdown' : '/api/countdown'
+    const method = isEdit.value ? 'PUT' : 'POST'
+    
+    const response = await uni.request({
+      url: url,
+      method: method,
+      header: {
+        'Authorization': `Bearer ${userStore.getToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        id: formData.id,
+        title: formData.title,
+        description: formData.description,
+        targetTime: targetDate.toISOString(),
+        color: formData.color,
+        userId: 1 // 暂时硬编码
+      }
+    })
+    
+    if (response.statusCode === 200 && response.data.code === 200) {
+      const newCountdown = response.data.data
+      const timeLeft = calculateTimeLeft(newCountdown.targetTime)
+      const countdownWithTime = {
+        ...newCountdown,
+        days: timeLeft.days,
+        hours: timeLeft.hours,
+        minutes: timeLeft.minutes,
+        isPast: timeLeft.isPast
+      }
+      
+      if (isEdit.value) {
+        const index = countdowns.value.findIndex(c => c.id === formData.id)
+        if (index !== -1) {
+          countdowns.value[index] = countdownWithTime
+        }
+      } else {
+        countdowns.value.push(countdownWithTime)
+      }
+      
+      closeCountdownDialog()
+      uni.showToast({ title: isEdit.value ? '倒计时更新成功' : '倒计时添加成功', icon: 'success' })
+    } else if (response.statusCode === 403) {
+      uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/login/login' })
+      }, 1000)
+    } else {
+      uni.showToast({ title: '操作失败', icon: 'none' })
+    }
+  } catch (error) {
+    uni.showToast({ title: '网络错误', icon: 'none' })
+  }
+}
+
+// 保存倒计时
+const saveCountdown = async () => {
+  if (!formData.title.trim() || !formData.year || !formData.month || !formData.day) {
     uni.showToast({ title: '请填写标题和日期', icon: 'none' })
     return
   }
   
-  const targetDate = new Date(`${formData.date} ${formData.time || '00:00'}`)
+  // 构建目标日期，时间部分设置为零点零分零秒
+  const year = formData.year
+  const month = formData.month.toString().padStart(2, '0')
+  const day = formData.day.toString().padStart(2, '0')
+  const targetDate = new Date(`${year}-${month}-${day}T00:00:00`)
   const now = new Date()
   const diff = targetDate - now
   
   if (diff <= 0) {
-    uni.showToast({ title: '目标时间必须在未来', icon: 'none' })
+    // 先关闭模态框，避免确认提示被遮挡
+    const wasOpen = isDialogOpen.value
+    isDialogOpen.value = false
+    
+    // 弹出确认对话框
+    uni.showModal({
+      title: '提示',
+      content: '选择的时间是过去的时间，确定要继续吗？',
+      success: (res) => {
+        if (res.confirm) {
+          // 用户确认，继续保存
+          saveCountdownWithTargetDate(targetDate)
+        } else {
+          // 用户取消，重新打开模态框
+          if (wasOpen) {
+            isDialogOpen.value = true
+          }
+        }
+      }
+    })
     return
   }
   
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-  
-  const countdown = {
-    title: formData.title,
-    description: formData.description,
-    date: formData.date,
-    time: formData.time || '00:00',
-    color: formData.color,
-    days,
-    hours,
-    minutes
-  }
-  
-  if (isEdit.value) {
-    countdowns.value[editIndex.value] = countdown
-  } else {
-    countdowns.value.push(countdown)
-  }
-  
-  closeCountdownDialog()
-  // 这里可以调用API保存倒计时
-  uni.showToast({ title: isEdit.value ? '倒计时更新成功' : '倒计时添加成功', icon: 'success' })
+  // 时间在未来，直接保存
+  saveCountdownWithTargetDate(targetDate)
 }
 
-const deleteCountdown = (index) => {
+const deleteCountdown = (id) => {
+  // 检查是否有 token
+  if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }, 1000)
+    return
+  }
+  
   uni.showModal({
     title: '确认删除',
     content: '确定要删除这个倒计时吗？',
-    success: (res) => {
+    success: async (res) => {
       if (res.confirm) {
-        countdowns.value.splice(index, 1)
-        // 这里可以调用API删除倒计时
-        uni.showToast({ title: '倒计时删除成功', icon: 'success' })
+        try {
+          const response = await uni.request({
+            url: `/api/countdown/${id}`,
+            method: 'DELETE',
+            header: {
+              'Authorization': `Bearer ${userStore.getToken}`
+            }
+          })
+          
+          if (response.statusCode === 200 && response.data.code === 200) {
+            const index = countdowns.value.findIndex(c => c.id === id)
+            if (index !== -1) {
+              countdowns.value.splice(index, 1)
+            }
+            uni.showToast({ title: '倒计时删除成功', icon: 'success' })
+          } else if (response.statusCode === 403) {
+            uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+            setTimeout(() => {
+              uni.navigateTo({ url: '/pages/login/login' })
+            }, 1000)
+          } else {
+            uni.showToast({ title: '删除失败', icon: 'none' })
+          }
+        } catch (error) {
+          uni.showToast({ title: '网络错误', icon: 'none' })
+        }
       }
     }
   })
@@ -228,33 +448,27 @@ const closeCountdownDialog = () => {
 
 const updateCountdowns = () => {
   countdowns.value.forEach(countdown => {
-    const targetDate = new Date(`${countdown.date} ${countdown.time}`)
-    const now = new Date()
-    const diff = targetDate - now
-    
-    if (diff > 0) {
-      countdown.days = Math.floor(diff / (1000 * 60 * 60 * 24))
-      countdown.hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-      countdown.minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-    } else {
-      countdown.days = 0
-      countdown.hours = 0
-      countdown.minutes = 0
-    }
+    const timeLeft = calculateTimeLeft(countdown.targetTime)
+    countdown.days = timeLeft.days
+    countdown.hours = timeLeft.hours
+    countdown.minutes = timeLeft.minutes
   })
   
   // 按时间排序
   countdowns.value.sort((a, b) => {
-    const dateA = new Date(`${a.date} ${a.time}`)
-    const dateB = new Date(`${b.date} ${b.time}`)
+    const dateA = new Date(a.targetTime)
+    const dateB = new Date(b.targetTime)
     return dateA - dateB
   })
 }
 
 // 生命周期
 onMounted(() => {
+  // 初始化用户信息
+  userStore.initUserInfo()
+  
   // 初始化数据
-  // 这里可以从API获取实际倒计时数据
+  fetchCountdowns()
   
   // 启动定时器
   timer = setInterval(updateCountdowns, 60000) // 每分钟更新一次
@@ -348,6 +562,13 @@ onUnmounted(() => {
   display: flex;
   gap: 20px;
   margin-bottom: 16px;
+}
+
+.countdown-status {
+  color: #ff4d4f;
+  font-size: 14px;
+  margin-bottom: 10px;
+  font-weight: 500;
 }
 
 .time-item {
@@ -502,6 +723,35 @@ onUnmounted(() => {
   font-size: 14px;
   margin-bottom: 12px;
   box-sizing: border-box;
+  line-height: 1.6;
+  min-height: 60px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.date-picker {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.date-picker select {
+  padding: 10px;
+  border: 1px solid #D8C8BE;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-right: 8px;
+  margin-left: 8px;
+  width: 80px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.date-picker select:first-child {
+  margin-left: 0;
+}
+
+.date-picker span {
+  font-size: 14px;
+  color: #333333;
 }
 
 .modal-body textarea {

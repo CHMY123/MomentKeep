@@ -22,4 +22,6 @@ public class UserRegisterDTO {
     
     @NotBlank(message = "手机号不能为空")
     private String phone;
+    
+    private boolean agreement;
 }

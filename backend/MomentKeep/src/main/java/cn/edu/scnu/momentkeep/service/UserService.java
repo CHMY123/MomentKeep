@@ -22,6 +22,10 @@ public interface UserService extends IService<User> {
     
     String uploadAvatar(MultipartFile file);
     
+    String uploadBackground(MultipartFile file);
+    
+    void clearBackground();
+    
     void logout();
     
     void deleteAccount();

@@ -67,8 +67,13 @@
 
       <!-- 协议 -->
       <view class="checkbox-item">
-        <checkbox v-model="formData.agreement" />
-        <text class="checkbox-text">我已阅读并同意用户协议和隐私政策</text>
+        <checkbox-group @change="handleAgreementChange">
+          <checkbox :checked="formData.agreement" value="agreement" />
+        </checkbox-group>
+        <text class="checkbox-text">我已阅读并同意</text>
+        <text class="link" @click="showUserAgreement">用户协议</text>
+        <text class="checkbox-text">和</text>
+        <text class="link" @click="showPrivacyPolicy">隐私政策</text>
       </view>
 
       <!-- 注册按钮 -->
@@ -86,11 +91,18 @@
 </template>
 
 <script setup>
+/**
+ * MomentKeep 朝暮记 - 注册页面
+ * @description 处理新用户注册，创建账户并自动登录
+ * @author MomentKeep Team
+ * @since 2026-04-18
+ */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
+// 表单数据模型
 const formData = ref({
   username: '',
   password: '',
@@ -100,10 +112,15 @@ const formData = ref({
   agreement: false
 })
 
+// 加载状态
 const loading = ref(false)
 
-// 注册
+/**
+ * 处理用户注册
+ * @description 验证表单数据，调用注册API，成功后跳转到登录页面
+ */
 const handleRegister = async () => {
+  // 表单验证
   if (!formData.value.username) {
     uni.showToast({ title: '请输入用户名', icon: 'none' })
     return
@@ -128,7 +145,7 @@ const handleRegister = async () => {
   loading.value = true
   try {
     const res = await uni.request({
-      url: 'http://localhost:8080/api/user/register',
+      url: '/api/user/register',
       method: 'POST',
       data: formData.value
     })
@@ -148,9 +165,42 @@ const handleRegister = async () => {
   }
 }
 
-// 去登录
+/**
+ * 跳转到登录页面
+ */
 const goToLogin = () => {
   router.push('/pages/login/login')
+}
+
+/**
+ * 显示用户协议弹窗
+ */
+const showUserAgreement = () => {
+  uni.showModal({
+    title: '用户协议',
+    content: '用户协议内容...',
+    showCancel: false,
+    confirmText: '我知道了'
+  })
+}
+
+/**
+ * 显示隐私政策弹窗
+ */
+const showPrivacyPolicy = () => {
+  uni.showModal({
+    title: '隐私政策',
+    content: '隐私政策内容...',
+    showCancel: false,
+    confirmText: '我知道了'
+  })
+}
+
+/**
+ * 处理用户协议复选框变化
+ */
+const handleAgreementChange = (e) => {
+  formData.value.agreement = e.detail.value.includes('agreement')
 }
 </script>
 
