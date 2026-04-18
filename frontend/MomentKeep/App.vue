@@ -8,15 +8,13 @@
 <script setup>
 /**
  * MomentKeep 朝暮记 - 根组件
- * @description 应用根组件，负责全局路由守卫和用户状态初始化
+ * @description 应用根组件，负责用户状态初始化
  * @author MomentKeep Team
  * @since 2026-04-18
  */
 import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useUserStore } from './store/user'
 
-const router = useRouter()
 const userStore = useUserStore()
 
 /**
@@ -24,23 +22,12 @@ const userStore = useUserStore()
  * @description 组件挂载时从本地存储恢复用户登录状态
  */
 onMounted(() => {
+  console.log('App组件挂载，开始初始化用户信息')
   userStore.initUserInfo()
+  console.log('用户信息初始化完成，登录状态:', userStore.getIsLoggedIn)
 
-  /**
-   * 路由守卫
-   * @description 验证用户登录状态，未登录用户访问非公共页面时重定向到登录页
-   */
-  router.beforeEach((to, from, next) => {
-    const isLoggedIn = userStore.getIsLoggedIn
-    const publicPages = ['/pages/login/login', '/pages/register/register']
-    const isPublicPage = publicPages.includes(to.path)
-
-    if (!isLoggedIn && !isPublicPage) {
-      next('/pages/login/login')
-    } else {
-      next()
-    }
-  })
+  // 微信小程序环境不需要Vue Router的路由守卫
+  // 登录状态检查在各个页面单独处理
 })
 </script>
 
@@ -53,7 +40,7 @@ onMounted(() => {
   --secondary-color: #94A7C8;
 }
 
-* {
+page, view, text, image, navigator, button, input, textarea, picker, picker-view {
   margin: 0;
   padding: 0;
   box-sizing: border-box;

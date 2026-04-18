@@ -120,12 +120,20 @@ export const useUserStore = defineStore('user', {
      * @description 从本地存储恢复用户登录状态，用于页面刷新后恢复登录
      */
     initUserInfo() {
-      const userInfo = uni.getStorageSync('userInfo')
-      const token = uni.getStorageSync('token')
-      if (userInfo && token) {
-        this.userInfo = userInfo
-        this.token = token
-        this.isLoggedIn = true
+      try {
+        const userInfo = uni.getStorageSync('userInfo')
+        const token = uni.getStorageSync('token')
+        console.log('从本地存储恢复登录状态:', { userInfo, token })
+        if (userInfo && token) {
+          this.userInfo = userInfo
+          this.token = token
+          this.isLoggedIn = true
+          console.log('登录状态恢复成功')
+        } else {
+          console.log('本地存储中没有登录信息')
+        }
+      } catch (error) {
+        console.error('恢复登录状态失败:', error)
       }
     }
   }

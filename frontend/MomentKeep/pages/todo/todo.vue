@@ -77,14 +77,15 @@
 
 <script setup>
 /**
- * MomentKeep 朝暮记 - 今日待办页面
- * @description 管理用户待办事项，支持添加、编辑、完成、删除操作
+ * MomentKeep 朝暮记 - 每日待办页面
+ * @description 提供待办事项的添加、编辑、删除、标记完成等功能
  * @author MomentKeep Team
  * @since 2026-04-18
  */
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, reactive } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
+import { get, post, put, del } from '../../utils/request'
 import { useCache } from '../../utils/cache'
 
 const userStore = useUserStore()
@@ -127,15 +128,12 @@ const fetchTodos = async () => {
       return []
     }
 
-    const response = await uni.request({
-      url: '/api/todo',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get('/todo', {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
-      return response.data.data || []
+    if (response.code === 200) {
+      return response.data || []
     }
     return []
   }
@@ -170,27 +168,21 @@ const addTodo = async () => {
     }
 
     try {
-      const response = await uni.request({
-        url: '/api/todo',
-        method: 'POST',
-        header: {
-          'Authorization': `Bearer ${userStore.getToken}`,
-          'Content-Type': 'application/json'
-        },
-        data: {
-          title: newTodo.title,
-          description: newTodo.description,
-          todoDate: new Date().toISOString().split('T')[0],
-          userId: 1
-        }
+      const response = await post('/todo', {
+        title: newTodo.title,
+        description: newTodo.description,
+        todoDate: new Date().toISOString().split('T')[0],
+        userId: 1
+      }, {
+        'Authorization': `Bearer ${userStore.getToken}`
       })
 
-      if (response.statusCode === 200 && response.data.code === 200) {
-        todos.value.push(response.data.data)
+      if (response.code === 200) {
+        todos.value.push(response.data)
         newTodo.title = ''
         newTodo.description = ''
         uni.showToast({ title: '待办添加成功', icon: 'success' })
-      } else if (response.statusCode === 403) {
+      } else if (response.code === 403) {
         uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
         setTimeout(() => {
           uni.navigateTo({ url: '/pages/login/login' })
@@ -288,25 +280,19 @@ const updateTodoStatus = async (id, completed) => {
   }
 
   try {
-    const response = await uni.request({
-      url: '/api/todo',
-      method: 'PUT',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`,
-        'Content-Type': 'application/json'
-      },
-      data: {
-        id: id,
-        completed: completed
-      }
+    const response = await put('/todo', {
+      id: id,
+      completed: completed
+    }, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
+    if (response.code === 200) {
       const index = todos.value.findIndex(t => t.id === id)
       if (index !== -1) {
         todos.value[index].completed = completed
       }
-    } else if (response.statusCode === 403) {
+    } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateTo({ url: '/pages/login/login' })
@@ -352,28 +338,22 @@ const saveTodo = async () => {
     }
 
     try {
-      const response = await uni.request({
-        url: '/api/todo',
-        method: 'PUT',
-        header: {
-          'Authorization': `Bearer ${userStore.getToken}`,
-          'Content-Type': 'application/json'
-        },
-        data: {
-          id: editTodoForm.id,
-          title: editTodoForm.title,
-          description: editTodoForm.description
-        }
+      const response = await put('/todo', {
+        id: editTodoForm.id,
+        title: editTodoForm.title,
+        description: editTodoForm.description
+      }, {
+        'Authorization': `Bearer ${userStore.getToken}`
       })
 
-      if (response.statusCode === 200 && response.data.code === 200) {
+      if (response.code === 200) {
         const index = todos.value.findIndex(t => t.id === editTodoForm.id)
         if (index !== -1) {
-          todos.value[index] = response.data.data
+          todos.value[index] = response.data
         }
         closeEditDialog()
         uni.showToast({ title: '待办更新成功', icon: 'success' })
-      } else if (response.statusCode === 403) {
+      } else if (response.code === 403) {
         uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
         setTimeout(() => {
           uni.navigateTo({ url: '/pages/login/login' })
@@ -401,35 +381,31 @@ const deleteTodo = (id) => {
     title: '确认删除',
     content: '确定要删除这个待办吗？',
     success: async (res) => {
-      if (res.confirm) {
-        try {
-          const response = await uni.request({
-            url: `/api/todo/${id}`,
-            method: 'DELETE',
-            header: {
-              'Authorization': `Bearer ${userStore.getToken}`
-            }
-          })
-          
-          if (response.statusCode === 200 && response.data.code === 200) {
-            const index = todos.value.findIndex(t => t.id === id)
-            if (index !== -1) {
-              todos.value.splice(index, 1)
-            }
-            uni.showToast({ title: '待办删除成功', icon: 'success' })
-          } else if (response.statusCode === 403) {
-            uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
-            setTimeout(() => {
-              uni.navigateTo({ url: '/pages/login/login' })
-            }, 1000)
-          } else {
-            uni.showToast({ title: '删除失败', icon: 'none' })
+    if (res.confirm) {
+      try {
+        const response = await del(`/todo/${id}`, {}, {
+          'Authorization': `Bearer ${userStore.getToken}`
+        })
+
+        if (response.code === 200) {
+          const index = todos.value.findIndex(t => t.id === id)
+          if (index !== -1) {
+            todos.value.splice(index, 1)
           }
-        } catch (error) {
-          uni.showToast({ title: '网络错误', icon: 'none' })
+          uni.showToast({ title: '待办删除成功', icon: 'success' })
+        } else if (response.code === 403) {
+          uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+          setTimeout(() => {
+            uni.navigateTo({ url: '/pages/login/login' })
+          }, 1000)
+        } else {
+          uni.showToast({ title: '删除失败', icon: 'none' })
         }
+      } catch (error) {
+        uni.showToast({ title: '网络错误', icon: 'none' })
       }
     }
+  }
   })
 }
 
@@ -466,15 +442,11 @@ onMounted(() => {
         if (res.confirm && userStore.getToken) {
           // 保留昨天的待办
           try {
-            const response = await uni.request({
-              url: '/api/todo/copy-yesterday',
-              method: 'POST',
-              header: {
-                'Authorization': `Bearer ${userStore.getToken}`
-              }
+            const response = await post('/todo/copy-yesterday', {}, {
+              'Authorization': `Bearer ${userStore.getToken}`
             })
             
-            if (response.statusCode === 200 && response.data.code === 200) {
+            if (response.code === 200) {
               uni.showToast({ title: '已保留昨天的待办', icon: 'success' })
               // 重新加载待办列表
               await fetchTodos()

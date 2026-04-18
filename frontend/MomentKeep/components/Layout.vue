@@ -13,9 +13,7 @@
     <!-- 侧边栏 -->
     <div class="sidebar" :class="{ 'sidebar-active': isSidebarOpen, 'sidebar-mobile': isMobile }">
       <div class="user-info">
-        <div class="avatar" @click="navigateToProfile">
-          <img :src="userAvatar" alt="avatar" />
-        </div>
+        <div class="avatar" @click="navigateToProfile" :style="{ backgroundImage: `url(${userAvatar})` }"></div>
         <div class="user-name">{{ userName }}</div>
       </div>
       
@@ -67,18 +65,21 @@
       </div>
       <div class="ai-content">
         <div class="ai-message ai-message-bot">
-          <div class="ai-avatar"></div>
+          <div class="ai-avatar" :style="{ backgroundImage: `url('/static/avatar/AI assistant.png')` }"></div>
           <div class="ai-message-content">
             <span>你好！我是你的AI助手，有什么可以帮助你的吗？</span>
           </div>
         </div>
         <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.type === 'user' ? 'ai-message-user' : 'ai-message-bot'">
-          <div v-if="message.type === 'user'" class="ai-avatar">
-            <img :src="userAvatar" alt="user avatar" />
-          </div>
-          <div v-else class="ai-avatar"></div>
+          <div v-if="message.type === 'user'" class="ai-avatar" :style="{ backgroundImage: `url(${userAvatar})` }"></div>
+          <div v-else class="ai-avatar" :style="{ backgroundImage: `url('/static/avatar/AI assistant.png')` }"></div>
           <div class="ai-message-content">
-            <span>{{ message.content }}</span>
+            <div v-if="message.loading" class="loading-indicator">
+              <span class="loading-dot"></span>
+              <span class="loading-dot"></span>
+              <span class="loading-dot"></span>
+            </div>
+            <div v-else class="markdown-content" v-html="marked(message.content)"></div>
           </div>
         </div>
       </div>
@@ -94,11 +95,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../store/user'
 import { useAppStore } from '../store/app'
+import { post, get } from '../utils/request'
+import { marked } from 'marked'
 
 const userStore = useUserStore()
 const appStore = useAppStore()
 
-const isSidebarOpen = ref(true)
+const isSidebarOpen = ref(false) // 默认关闭侧边栏
 const isAIChatOpen = ref(false)
 const aiMessages = ref([])
 const aiInput = ref('')
@@ -116,25 +119,36 @@ const themeBackgrounds = [
 const currentBackgroundStyle = ref({})
 
 const updateBackgroundStyle = () => {
-  const backgroundImage = localStorage.getItem('backgroundImage')
-  const selectedTheme = localStorage.getItem('selectedTheme')
+  try {
+    const backgroundImage = uni.getStorageSync('backgroundImage')
+    const selectedTheme = uni.getStorageSync('selectedTheme')
 
-  let bgImage = ''
-  if (backgroundImage) {
-    bgImage = backgroundImage
-  } else if (selectedTheme !== null && parseInt(selectedTheme) >= 0 && parseInt(selectedTheme) < themeBackgrounds.length) {
-    bgImage = themeBackgrounds[parseInt(selectedTheme)].image
-  }
-
-  if (bgImage) {
-    currentBackgroundStyle.value = {
-      backgroundImage: `url(${bgImage})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat'
+    let bgImage = ''
+    if (backgroundImage) {
+      bgImage = backgroundImage
+    } else if (selectedTheme !== null && parseInt(selectedTheme) >= 0 && parseInt(selectedTheme) < themeBackgrounds.length) {
+      bgImage = themeBackgrounds[parseInt(selectedTheme)].image
     }
-  } else {
-    currentBackgroundStyle.value = {}
+
+    if (bgImage) {
+      currentBackgroundStyle.value = {
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
+    } else {
+      // 添加默认背景色，避免微信小程序中背景变成纯白
+      currentBackgroundStyle.value = {
+        backgroundColor: '#F2EEE8'
+      }
+    }
+  } catch (e) {
+    console.error('读取背景设置失败:', e)
+    // 出错时也添加默认背景色
+    currentBackgroundStyle.value = {
+      backgroundColor: '#F2EEE8'
+    }
   }
 }
 
@@ -180,7 +194,8 @@ const toggleAIChat = () => {
 
 const navigateTo = (path, menuId) => {
   appStore.setActiveMenu(menuId)
-  uni.navigateTo({
+  // 使用uni.reLaunch避免页面栈溢出和switchTab错误
+  uni.reLaunch({
     url: `/${path}`
   })
   if (isMobile.value) {
@@ -189,11 +204,12 @@ const navigateTo = (path, menuId) => {
 }
 
 const navigateToProfile = () => {
-  uni.navigateTo({
+  // 个人资料页面使用reLaunch
+  uni.reLaunch({
     url: '/pages/profile/profile'
   })
   // 在移动端自动关闭侧边栏
-  if (window.innerWidth < 768) {
+  if (isMobile.value) {
     isSidebarOpen.value = false
   }
 }
@@ -205,24 +221,40 @@ const sendAIMessage = async () => {
     aiInput.value = ''
 
     try {
-      const response = await uni.request({
-        url: '/api/ai/chat',
-        method: 'POST',
-        header: {
-          'Authorization': `Bearer ${userStore.getToken}`,
-          'Content-Type': 'application/json'
-        },
-        data: { message: userMessage }
+      // 添加一个临时的加载消息
+      const loadingMessageId = aiMessages.value.length
+      aiMessages.value.push({ type: 'bot', content: '', loading: true })
+
+      const response = await post('/ai/chat', { message: userMessage }, {
+        'Authorization': `Bearer ${userStore.getToken}`
       })
 
-      if (response.statusCode === 200 && response.data.code === 200) {
-        aiMessages.value.push({ type: 'bot', content: response.data.data })
+      if (response.code === 200) {
+        const aiResponse = response.data
+        // 替换加载消息为实际的AI回复
+        aiMessages.value[loadingMessageId] = { type: 'bot', content: aiResponse }
+        
+        // 模拟流式输出
+        const message = aiMessages.value[loadingMessageId]
+        const fullContent = message.content
+        message.content = ''
+        message.loading = false
+        
+        let index = 0
+        const interval = setInterval(() => {
+          if (index < fullContent.length) {
+            message.content += fullContent[index]
+            index++
+          } else {
+            clearInterval(interval)
+          }
+        }, 50)
       } else {
-        aiMessages.value.push({ type: 'bot', content: '抱歉，AI助手暂时无法回复。' })
+        aiMessages.value[loadingMessageId] = { type: 'bot', content: '抱歉，AI助手暂时无法回复。' }
       }
     } catch (error) {
       console.error('AI chat error:', error)
-      aiMessages.value.push({ type: 'bot', content: '网络错误，请稍后再试。' })
+      aiMessages.value[aiMessages.value.length - 1] = { type: 'bot', content: '网络错误，请稍后再试。' }
     }
   } else if (!userStore.getToken) {
     uni.showToast({ title: '请先登录', icon: 'none' })
@@ -233,16 +265,12 @@ const loadChatHistory = async () => {
   if (!userStore.getToken) return
 
   try {
-    const response = await uni.request({
-      url: '/api/ai/history',
-      method: 'GET',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get('/ai/history', {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200 && response.data.data) {
-      const history = response.data.data
+    if (response.code === 200 && response.data) {
+      const history = response.data
       aiMessages.value = []
       for (const msg of history) {
         if (msg.role === 'user') {
@@ -259,7 +287,20 @@ const loadChatHistory = async () => {
 
 // 检测是否为移动端
 const checkMobile = () => {
-  isMobile.value = window.innerWidth < 768
+  try {
+    // 使用uni-app的API获取设备信息
+    const systemInfo = uni.getSystemInfoSync()
+    // 小程序环境或屏幕宽度小于768px视为移动端
+    isMobile.value = systemInfo.platform === 'devtools' || systemInfo.platform === 'mp-weixin' || systemInfo.screenWidth < 768
+  } catch (e) {
+    // 降级方案：使用window对象
+    if (typeof window !== 'undefined') {
+      isMobile.value = window.innerWidth < 768
+    } else {
+      // 默认视为移动端
+      isMobile.value = true
+    }
+  }
   // 移动端默认关闭侧边栏
   if (isMobile.value) {
     isSidebarOpen.value = false
@@ -278,8 +319,8 @@ const handleBackgroundUpdate = (event) => {
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat'
     }
-    localStorage.setItem('selectedTheme', selectedTheme.toString())
-    localStorage.removeItem('backgroundImage')
+    uni.setStorageSync('selectedTheme', selectedTheme.toString())
+    uni.removeStorageSync('backgroundImage')
   } else if (type === 'custom' && image) {
     currentBackgroundStyle.value = {
       backgroundImage: `url(${image})`,
@@ -287,8 +328,8 @@ const handleBackgroundUpdate = (event) => {
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat'
     }
-    localStorage.setItem('backgroundImage', image)
-    localStorage.setItem('selectedTheme', '-1')
+    uni.setStorageSync('backgroundImage', image)
+    uni.setStorageSync('selectedTheme', '-1')
   }
 }
 
@@ -299,14 +340,11 @@ onMounted(async () => {
 
   if (userStore.getToken) {
     try {
-      const response = await uni.request({
-        url: '/api/user/profile',
-        header: {
-          'Authorization': `Bearer ${userStore.getToken}`
-        }
+      const response = await get('/user/profile', {}, {
+        'Authorization': `Bearer ${userStore.getToken}`
       })
-      if (response.statusCode === 200 && response.data.code === 200) {
-        const profile = response.data.data
+      if (response.code === 200) {
+        const profile = response.data
         userStore.setUserInfo(profile)
       }
     } catch (error) {
@@ -317,8 +355,11 @@ onMounted(async () => {
   checkMobile()
   updateActiveMenu() // 直接调用，不延迟
 
-  window.addEventListener('resize', checkMobile)
-  window.addEventListener('background-updated', handleBackgroundUpdate)
+  // 只在浏览器环境中添加事件监听器
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', checkMobile)
+    window.addEventListener('background-updated', handleBackgroundUpdate)
+  }
 })
 
 const updateActiveMenu = () => {
@@ -343,8 +384,10 @@ const updateActiveMenu = () => {
 
 onUnmounted(() => {
   // 移除窗口大小监听
-  window.removeEventListener('resize', checkMobile)
-  window.removeEventListener('background-updated', handleBackgroundUpdate)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', checkMobile)
+    window.removeEventListener('background-updated', handleBackgroundUpdate)
+  }
 })
 </script>
 
@@ -354,10 +397,10 @@ onUnmounted(() => {
   display: flex;
   height: 100vh;
   position: relative;
-  color: var(--text-color);
+  color: #333333;
   transition: all 0.3s ease;
   overflow: hidden;
-  background-color: var(--bg-color);
+  background-color: #F2EEE8;
 }
 
 /* 背景层 */
@@ -370,7 +413,7 @@ onUnmounted(() => {
   z-index: 0;
   filter: blur(8px);
   transition: background-image 0.3s ease, opacity 0.3s ease;
-  background-color: var(--bg-color);
+  background-color: #F2EEE8;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -404,14 +447,14 @@ onUnmounted(() => {
   background: rgba(242, 238, 232, 0.8);
   backdrop-filter: blur(10px);
   box-shadow: 1px 0 4px rgba(0, 0, 0, 0.1);
-  border-right: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
   transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   display: flex;
   flex-direction: column;
   padding-top: 20px;
   position: relative;
   z-index: 99;
-  color: var(--text-color);
+  color: #333333;
 }
 
 .sidebar-active {
@@ -425,7 +468,7 @@ onUnmounted(() => {
   left: 20px;
   width: 44px;
   height: 44px;
-  background-color: var(--primary-color);
+  background-color: #C2977F;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -437,7 +480,7 @@ onUnmounted(() => {
 }
 
 .floating-toggle-btn:hover {
-  background-color: var(--secondary-color);
+  background-color: #94A7C8;
   transform: scale(1.05);
 }
 
@@ -510,16 +553,17 @@ onUnmounted(() => {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  overflow: hidden;
   margin-bottom: 12px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  background-color: #f0f0f0;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .user-name {
@@ -665,7 +709,7 @@ onUnmounted(() => {
 }
 
 .menu-text-active {
-  color: var(--primary-color);
+  color: #C2977F;
   font-weight: 500;
 }
 
@@ -676,7 +720,7 @@ onUnmounted(() => {
   flex-direction: column;
   transition: all 0.3s ease;
   background: transparent;
-  color: var(--text-color);
+  color: #333333;
 }
 
 .header {
@@ -697,7 +741,7 @@ onUnmounted(() => {
   flex: 1;
   font-size: 18px;
   font-weight: 600;
-  color: var(--primary-color);
+  color: #C2977F;
 }
 
 .header-right {
@@ -728,7 +772,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   z-index: 100;
-  color: var(--text-color);
+  color: #333333;
 }
 
 .ai-sidebar-active {
@@ -747,7 +791,7 @@ onUnmounted(() => {
 .ai-title {
   font-size: 16px;
   font-weight: 500;
-  color: var(--text-color);
+  color: #333333;
 }
 
 .close-icon {
@@ -778,7 +822,7 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: var(--secondary-color);
+  background-color: #94A7C8;
   color: white;
   display: flex;
   align-items: center;
@@ -789,11 +833,15 @@ onUnmounted(() => {
 }
 
 .ai-message-bot .ai-avatar {
-  background-color: var(--secondary-color);
-  background-image: url('/static/avatar/AI assistant.png');
-  background-size: cover;
-  background-position: center;
+  background-color: #94A7C8;
   border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .ai-message-bot .ai-avatar::before {
@@ -805,15 +853,14 @@ onUnmounted(() => {
 }
 
 .ai-message-user .ai-avatar {
-  background-color: var(--primary-color);
+  background-color: #C2977F;
   overflow: hidden;
-}
-
-.ai-message-user .ai-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .ai-message-content {
@@ -823,12 +870,138 @@ onUnmounted(() => {
   border-radius: 16px;
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  color: var(--text-color);
+  color: #333333;
 }
 
 .ai-message-user .ai-message-content {
-  background-color: var(--primary-color);
+  background-color: #C2977F;
   color: white;
+}
+
+/* 加载指示器 */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #94A7C8;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.loading-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Markdown内容样式 */
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+  font-weight: 600;
+  margin: 12px 0 8px 0;
+  color: inherit;
+}
+
+.markdown-content h1 {
+  font-size: 18px;
+}
+
+.markdown-content h2 {
+  font-size: 16px;
+}
+
+.markdown-content h3 {
+  font-size: 14px;
+}
+
+.markdown-content p {
+  margin: 8px 0;
+}
+
+.markdown-content ul, .markdown-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.markdown-content li {
+  margin: 4px 0;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-content code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.markdown-content pre {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  font-size: 12px;
+}
+
+.markdown-content a {
+  color: #C2977F;
+  text-decoration: underline;
+}
+
+/* 用户消息的Markdown样式 */
+.ai-message-user .markdown-content {
+  color: white;
+}
+
+.ai-message-user .markdown-content a {
+  color: #F2EEE8;
+}
+
+.ai-message-user .markdown-content code {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.ai-message-user .markdown-content pre {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.ai-message-user .markdown-content pre code {
+  background-color: transparent;
 }
 
 .ai-input {
@@ -850,20 +1023,20 @@ onUnmounted(() => {
   border-radius: 22px;
   background-color: white;
   font-size: 14px;
-  color: var(--text-color);
+  color: #333333;
   outline: none;
   box-sizing: border-box;
 }
 
 .ai-input input:focus {
-  border-color: var(--primary-color);
+  border-color: #C2977F;
 }
 
 .ai-input button {
   flex-shrink: 0;
   height: 44px;
   padding: 0 20px;
-  background-color: var(--primary-color);
+  background-color: #C2977F;
   color: white;
   border: none;
   border-radius: 22px;
@@ -876,7 +1049,7 @@ onUnmounted(() => {
 }
 
 .ai-input button:hover {
-  background-color: var(--secondary-color);
+  background-color: #94A7C8;
 }
 
 /* 响应式设计 */

@@ -26,7 +26,8 @@
         <text class="label">密码</text>
         <input
           v-model="formData.password"
-          type="password"
+          type="text"
+          password
           placeholder="请输入密码"
           class="input-box"
         />
@@ -68,15 +69,14 @@
 <script setup>
 /**
  * MomentKeep 朝暮记 - 登录页面
- * @description 处理用户登录认证，包括用户名密码验证和JWT令牌管理
+ * @description 处理用户登录认证，包括表单验证、API调用和错误处理
  * @author MomentKeep Team
  * @since 2026-04-18
  */
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive } from 'vue'
 import { useUserStore } from '../../store/user'
+import { post } from '../../utils/request'
 
-const router = useRouter()
 const userStore = useUserStore()
 
 // 表单数据模型
@@ -107,25 +107,22 @@ const handleLogin = async () => {
 
   loading.value = true
   try {
-    const res = await uni.request({
-      url: '/api/user/login',
-      method: 'POST',
-      data: formData.value
-    })
+    const res = await post('/user/login', formData.value)
 
-    if (res.data.code === 200) {
-      const { token, user } = res.data.data
+    if (res.code === 200) {
+      const { token, user } = res.data
       userStore.setUser(user)
       userStore.setToken(token)
       uni.showToast({ title: '登录成功', icon: 'success' })
-      setTimeout(() => {
-        router.push('/pages/index/index')
-      }, 1000)
+        setTimeout(() => {
+          uni.navigateTo({ url: '/pages/index/index' })
+        }, 1000)
     } else {
-      uni.showToast({ title: res.data.message || '登录失败', icon: 'none' })
+      uni.showToast({ title: res.message || '登录失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络异常，请重试', icon: 'none' })
+    console.error('登录失败:', error)
+    uni.showToast({ title: '网络错误，请稍后重试', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -135,7 +132,7 @@ const handleLogin = async () => {
  * 跳转到注册页面
  */
 const goToRegister = () => {
-  router.push('/pages/register/register')
+  uni.navigateTo({ url: '/pages/register/register' })
 }
 
 /**
@@ -264,7 +261,7 @@ const handleAgreementChange = (e) => {
 }
 
 .checkbox-text {
-  font-size: 14px;
+  font-size: 12px;
   color: #666;
   margin-left: 6px;
 }
@@ -278,7 +275,10 @@ const handleAgreementChange = (e) => {
   border-radius: 8px;
   font-size: 16px;
   font-weight: 500;
-  margin-top: 8px;
+  margin-top: 24px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .login-btn:disabled {
@@ -296,5 +296,6 @@ const handleAgreementChange = (e) => {
 .link {
   color: #C2977F;
   margin-left: 6px;
+  font-size: 12px;
 }
 </style>

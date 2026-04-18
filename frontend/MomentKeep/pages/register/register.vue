@@ -26,7 +26,8 @@
         <text class="label">密码</text>
         <input
           v-model="formData.password"
-          type="password"
+          type="text"
+          password
           placeholder="请输入密码（至少6位）"
           class="input-box"
         />
@@ -98,9 +99,7 @@
  * @since 2026-04-18
  */
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
+import { post } from '../../utils/request'
 
 // 表单数据模型
 const formData = ref({
@@ -144,19 +143,15 @@ const handleRegister = async () => {
 
   loading.value = true
   try {
-    const res = await uni.request({
-      url: '/api/user/register',
-      method: 'POST',
-      data: formData.value
-    })
+    const res = await post('/user/register', formData.value)
 
-    if (res.data.code === 200) {
+    if (res.code === 200) {
       uni.showToast({ title: '注册成功', icon: 'success' })
-      setTimeout(() => {
-        router.push('/pages/login/login')
-      }, 1000)
+        setTimeout(() => {
+          uni.navigateTo({ url: '/pages/login/login' })
+        }, 1000)
     } else {
-      uni.showToast({ title: res.data.message || '注册失败', icon: 'none' })
+      uni.showToast({ title: res.message || '注册失败', icon: 'none' })
     }
   } catch (e) {
     uni.showToast({ title: '网络异常，请重试', icon: 'none' })
@@ -169,7 +164,7 @@ const handleRegister = async () => {
  * 跳转到登录页面
  */
 const goToLogin = () => {
-  router.push('/pages/login/login')
+  uni.navigateTo({ url: '/pages/login/login' })
 }
 
 /**
@@ -291,7 +286,7 @@ const handleAgreementChange = (e) => {
 }
 
 .checkbox-text {
-  font-size: 14px;
+  font-size: 12px;
   color: #666;
   margin-left: 6px;
 }
@@ -305,7 +300,10 @@ const handleAgreementChange = (e) => {
   border-radius: 8px;
   font-size: 16px;
   font-weight: 500;
-  margin-top: 8px;
+  margin-top: 24px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .register-btn:disabled {
@@ -323,5 +321,6 @@ const handleAgreementChange = (e) => {
 .link {
   color: #C2977F;
   margin-left: 6px;
+  font-size: 12px;
 }
 </style>

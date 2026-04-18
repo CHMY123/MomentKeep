@@ -185,38 +185,39 @@
       <div class="chart-section">
         <div class="section-title">时间分布</div>
         <div class="chart-controls">
-          <select v-model="selectedCheckinType" @change="fetchTimeDistribution">
-            <option value="early">早起打卡</option>
-            <option value="sleep">睡眠打卡</option>
-            <option value="meal">用餐打卡</option>
-            <option value="exercise">运动打卡</option>
-          </select>
-          <select v-if="(selectedCheckinType === 'meal' || selectedCheckinType === 'exercise')" v-model="selectedSubType" @change="fetchTimeDistribution">
-            <option value="all">全部类型</option>
-            <option v-for="type in getSubTypes(selectedCheckinType)" :key="type" :value="type">{{ type }}</option>
-            <option value="other">其他类型</option>
-          </select>
+          <picker :value="checkinTypeIndex" :range="checkinTypeOptions" range-key="label" @change="onCheckinTypeChange">
+            <view class="picker-box">
+              {{ checkinTypeOptions[checkinTypeIndex].label }}
+            </view>
+          </picker>
+          <picker v-if="(selectedCheckinType === 'meal' || selectedCheckinType === 'exercise')" :value="subTypeIndex" :range="subTypeOptions" range-key="label" @change="onSubTypeChange">
+            <view class="picker-box">
+              {{ subTypeOptions[subTypeIndex].label }}
+            </view>
+          </picker>
         </div>
         <div class="time-distribution-chart">
-          <div v-if="timeDistribution && timeDistribution.length > 0" class="chart-container">
-            <div class="chart-axes">
-              <div class="y-axis">
-                <div v-for="(label, index) in yAxisLabels" :key="index" class="axis-label">{{ label }}</div>
-              </div>
-              <div class="chart-bars">
-                <div v-for="(item, index) in timeDistribution" :key="index" class="chart-bar">
-                  <div class="bar-value">{{ item.count }}</div>
-                  <div class="bar-container">
-                    <div class="bar-fill" :style="{ height: maxCount > 0 ? (item.count || 0) / maxCount * 100 + '%' : '0%' }"></div>
+          <scroll-view scroll-x="true" class="chart-scroll-container" show-scrollbar="false">
+            <div v-if="timeDistribution && timeDistribution.length > 0" class="chart-container">
+              <div class="chart-axes">
+                <div class="y-axis">
+                  <div v-for="(label, index) in yAxisLabels" :key="index" class="axis-label">{{ label }}</div>
+                </div>
+                <div class="chart-bars">
+                  <div v-for="(item, index) in timeDistribution" :key="index" class="chart-bar">
+                    <div class="bar-value">{{ item.count }}</div>
+                    <div class="bar-container">
+                      <div class="bar-fill" :style="{ height: maxCount > 0 ? (item.count || 0) / maxCount * 100 + '%' : '0%' }"></div>
+                    </div>
+                    <div class="bar-label">{{ formatTimeRange(item.timeRange) }}</div>
                   </div>
-                  <div class="bar-label">{{ item.timeRange }}</div>
                 </div>
               </div>
             </div>
-          </div>
-          <div v-else class="empty-chart">
-            暂无数据
-          </div>
+            <div v-else class="empty-chart">
+              暂无数据
+            </div>
+          </scroll-view>
         </div>
       </div>
       
@@ -260,13 +261,14 @@
 <script setup>
 /**
  * MomentKeep 朝暮记 - 每日打卡页面
- * @description 处理用户每日打卡功能，支持早起、睡眠、用餐、运动四种打卡类型
+ * @description 提供早起、睡眠、用餐、运动等打卡功能，以及打卡数据统计和时间分布分析
  * @author MomentKeep Team
  * @since 2026-04-18
  */
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, reactive } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
+import { get, post } from '../../utils/request'
 import { useCache } from '../../utils/cache'
 
 const userStore = useUserStore()
@@ -308,6 +310,17 @@ const selectedSubType = ref('all')
 const timeDistribution = ref([])
 const maxCount = ref(6)
 const yAxisLabels = ref([])
+
+// 时间分布选择器相关
+const checkinTypeOptions = [
+  { label: '早起打卡', value: 'early' },
+  { label: '睡眠打卡', value: 'sleep' },
+  { label: '用餐打卡', value: 'meal' },
+  { label: '运动打卡', value: 'exercise' }
+]
+const checkinTypeIndex = ref(0)
+const subTypeOptions = ref([])
+const subTypeIndex = ref(0)
 
 // 加载状态
 const loading = ref(false)
@@ -365,17 +378,11 @@ const checkin = async (type) => {
   try {
     loading.value = true
 
-    const response = await uni.request({
-      url: '/api/checkin',
-      method: 'POST',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`,
-        'Content-Type': 'application/json'
-      },
-      data: checkinData
+    const response = await post('/checkin', checkinData, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
+    if (response.code === 200) {
       switch (type) {
         case 'early':
           checkins.early = true
@@ -423,7 +430,7 @@ const checkin = async (type) => {
       await fetchCheckinStats()
 
       uni.showToast({ title: '打卡成功', icon: 'success' })
-    } else if (response.statusCode === 403) {
+    } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateTo({ url: '/pages/login/login' })
@@ -524,15 +531,11 @@ const cancelCheckin = async (type) => {
     loading.value = true
 
     const date = getCurrentDate()
-    const response = await uni.request({
-      url: `/api/checkin?type=${type}&date=${date}`,
-      method: 'DELETE',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await del(`/checkin?type=${type}&date=${date}`, {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
+    if (response.code === 200) {
       switch (type) {
         case 'early':
           checkins.early = false
@@ -604,15 +607,11 @@ const resetMealCheckin = async () => {
     loading.value = true
 
     const date = getCurrentDate()
-    const response = await uni.request({
-      url: `/api/checkin?type=meal&date=${date}`,
-      method: 'DELETE',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await del(`/checkin?type=meal&date=${date}`, {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
+    if (response.code === 200) {
       checkins.meals = []
       selectedMealType.value = ''
 
@@ -639,7 +638,7 @@ const resetMealCheckin = async () => {
       await fetchCheckinStats()
 
       uni.showToast({ title: '已重置，请重新打卡', icon: 'success' })
-    } else if (response.statusCode === 403) {
+    } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateTo({ url: '/pages/login/login' })
@@ -732,6 +731,56 @@ const getSubTypes = (type) => {
   return []
 }
 
+/**
+ * 处理打卡类型选择变化
+ * @param {Object} e - picker事件对象
+ */
+const onCheckinTypeChange = (e) => {
+  const index = e.detail.value
+  checkinTypeIndex.value = index
+  selectedCheckinType.value = checkinTypeOptions[index].value
+
+  // 更新子类型选项
+  updateSubTypeOptions()
+  // 重新获取时间分布
+  fetchTimeDistribution()
+}
+
+/**
+ * 更新子类型选项
+ */
+const updateSubTypeOptions = () => {
+  if (selectedCheckinType.value === 'meal') {
+    subTypeOptions.value = [
+      { label: '全部类型', value: 'all' },
+      ...mealTypes.map(type => ({ label: type, value: type })),
+      { label: '其他类型', value: 'other' }
+    ]
+    subTypeIndex.value = 0
+    selectedSubType.value = 'all'
+  } else if (selectedCheckinType.value === 'exercise') {
+    subTypeOptions.value = [
+      { label: '全部类型', value: 'all' },
+      ...exerciseTypes.map(type => ({ label: type, value: type })),
+      { label: '其他类型', value: 'other' }
+    ]
+    subTypeIndex.value = 0
+    selectedSubType.value = 'all'
+  }
+}
+
+/**
+ * 处理子类型选择变化
+ * @param {Object} e - picker事件对象
+ */
+const onSubTypeChange = (e) => {
+  const index = e.detail.value
+  subTypeIndex.value = index
+  selectedSubType.value = subTypeOptions.value[index].value
+  // 重新获取时间分布
+  fetchTimeDistribution()
+}
+
 // 获取时间分布数据
 const fetchTimeDistribution = async () => {
   if (!userStore.getToken) {
@@ -743,18 +792,17 @@ const fetchTimeDistribution = async () => {
       type: selectedCheckinType.value,
       subType: selectedSubType.value
     })
-    const response = await uni.request({
-      url: `/api/checkin/time-distribution?type=${selectedCheckinType.value}&subType=${selectedSubType.value}`,
-      method: 'GET',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get('/checkin/time-distribution', {
+      type: selectedCheckinType.value,
+      subType: selectedSubType.value
+    }, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     console.log('时间分布响应:', response)
 
-    if (response.statusCode === 200 && response.data.code === 200) {
-      timeDistribution.value = response.data.data || []
+    if (response.code === 200) {
+      timeDistribution.value = response.data || []
       console.log('时间分布数据:', timeDistribution.value)
       
       // 计算最大值并生成动态纵坐标
@@ -811,6 +859,19 @@ const generateYAxisLabels = () => {
   yAxisLabels.value = labels
 }
 
+// 格式化时间范围显示
+const formatTimeRange = (timeRange) => {
+  if (!timeRange) return ''
+  // 假设timeRange格式为 "HH:MM-HH:MM"
+  const parts = timeRange.split('-')
+  if (parts.length !== 2) return timeRange
+  
+  const startHour = parseInt(parts[0].split(':')[0])
+  const endHour = parseInt(parts[1].split(':')[0])
+  
+  return `${startHour}时-${endHour}时`
+}
+
 // 取消特定的用餐打卡
 const cancelMealCheckin = async (index) => {
   // 检查是否登录
@@ -827,15 +888,11 @@ const cancelMealCheckin = async (index) => {
     
     const date = getCurrentDate()
     // 调用API删除打卡记录
-    const response = await uni.request({
-      url: `/api/checkin?type=meal&date=${date}`,
-      method: 'DELETE',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await del(`/checkin?type=meal&date=${date}`, {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
     
-    if (response.statusCode === 200 && response.data.code === 200) {
+    if (response.code === 200) {
       // 更新本地状态
       checkins.meals.splice(index, 1)
 
@@ -864,7 +921,7 @@ const cancelMealCheckin = async (index) => {
       await fetchCheckinStats()
 
       uni.showToast({ title: '取消打卡成功', icon: 'success' })
-    } else if (response.statusCode === 403) {
+    } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateTo({ url: '/pages/login/login' })
@@ -895,15 +952,11 @@ const cancelExerciseCheckin = async (index) => {
     
     const date = getCurrentDate()
     // 调用API删除打卡记录
-    const response = await uni.request({
-      url: `/api/checkin?type=exercise&date=${date}`,
-      method: 'DELETE',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await del(`/checkin?type=exercise&date=${date}`, {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
     
-    if (response.statusCode === 200 && response.data.code === 200) {
+    if (response.code === 200) {
       // 更新本地状态
       checkins.exercises.splice(index, 1)
 
@@ -932,7 +985,7 @@ const cancelExerciseCheckin = async (index) => {
       await fetchCheckinStats()
 
       uni.showToast({ title: '取消打卡成功', icon: 'success' })
-    } else if (response.statusCode === 403) {
+    } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateTo({ url: '/pages/login/login' })
@@ -957,15 +1010,12 @@ const fetchCheckins = async () => {
       return []
     }
 
-    const response = await uni.request({
-      url: `/api/checkin/by-date?date=${date}`,
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get(`/checkin/by-date?date=${date}`, {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
-      return response.data.data || []
+    if (response.code === 200) {
+      return response.data || []
     }
     return []
   }
@@ -1025,16 +1075,13 @@ const fetchCheckinStats = async () => {
   const cacheKey = 'checkin_stats'
 
   const fetchFn = async () => {
-    const response = await uni.request({
-      url: '/api/checkin/stats',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get('/checkin/stats', {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
     
-    if (response.statusCode === 200 && response.data.code === 200) {
-      return response.data.data || {}
-    } else if (response.statusCode === 403) {
+    if (response.code === 200) {
+      return response.data || {}
+    } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateTo({ url: '/pages/login/login' })
@@ -1064,10 +1111,13 @@ onMounted(() => {
     }, 1000)
     return
   }
-  
+
   // 初始化纵坐标标签
   generateYAxisLabels()
-  
+
+  // 初始化子类型选项
+  updateSubTypeOptions()
+
   // 初始化数据（异步加载，不阻塞页面渲染）
   fetchCheckins()
   fetchCheckinStats()
@@ -1078,6 +1128,9 @@ onMounted(() => {
 <style scoped>
 .checkin-container {
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* 打卡卡片 */
@@ -1378,24 +1431,47 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.chart-controls select {
+.chart-controls picker {
+  flex: 1;
+  min-width: 150px;
+}
+
+.picker-box {
   padding: 8px 12px;
   border: 1px solid #E8D5C4;
   border-radius: 6px;
   background-color: #FFFFFF;
   font-size: 14px;
   color: #333333;
-  flex: 1;
-  min-width: 150px;
 }
 
 .time-distribution-chart {
   margin-top: 20px;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.chart-scroll-container {
+  padding-bottom: 80px;
+  max-height: 450px;
+  position: relative;
+  width: 100%;
+  white-space: nowrap;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .chart-container {
-  height: 300px;
+  height: 450px;
   margin-top: 20px;
+  vertical-align: top;
+  width: auto;
+  min-width: 100%;
+  display: inline-block;
+  box-sizing: border-box;
 }
 
 .chart-axes {
@@ -1405,6 +1481,7 @@ onMounted(() => {
   padding-left: 40px;
   padding-right: 20px;
   position: relative;
+  box-sizing: border-box;
 }
 
 .y-axis {
@@ -1429,12 +1506,12 @@ onMounted(() => {
 .chart-bars {
   display: flex;
   align-items: flex-end;
-  justify-content: space-around;
   flex: 1;
   height: 100%;
   gap: 15px;
-  padding-bottom: 30px;
+  padding-bottom: 80px;
   position: relative;
+  overflow-y: hidden;
 }
 
 .chart-bars::after {
@@ -1451,8 +1528,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 1;
-  max-width: 40px;
+  flex: 0 0 60px;
+  max-width: 60px;
   position: relative;
 }
 

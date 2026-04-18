@@ -97,6 +97,7 @@ import { ref, onMounted } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
 import { useCache } from '../../utils/cache'
+import { get } from '../../utils/request'
 
 const userStore = useUserStore()
 const { getCache, setCache, fetchWithCache } = useCache()
@@ -135,15 +136,12 @@ const fetchCountdowns = async () => {
   }
 
   const fetchFn = async () => {
-    const response = await uni.request({
-      url: '/api/countdown',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get('/countdown', {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
-      const countdownList = response.data.data || []
+    if (response.code === 200) {
+      const countdownList = response.data || []
       const now = new Date()
       const sortedCountdowns = countdownList
         .filter(countdown => countdown && countdown.targetTime)
@@ -193,15 +191,12 @@ const fetchCheckinStats = async () => {
   const cacheKey = `checkinStats_${date}`
 
   const fetchFn = async () => {
-    const response = await uni.request({
-      url: `/api/checkin/by-date?date=${date}`,
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get(`/checkin/by-date`, { date }, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
-      return response.data.data || []
+    if (response.code === 200) {
+      return response.data || []
     }
     return []
   }

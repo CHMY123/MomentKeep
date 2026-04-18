@@ -114,6 +114,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
+import { post, put, del } from '../../utils/request'
 
 const isDeleteDialogVisible = ref(false)
 const isChangePasswordDialogVisible = ref(false)
@@ -156,8 +157,10 @@ const uploadAvatar = () => {
     success: (res) => {
       // 上传图片到服务器
       const tempFilePaths = res.tempFilePaths
+      // 使用完整的API基础URL
+      const apiUrl = 'http://localhost:8080/api/user/avatar'
       uni.uploadFile({
-        url: '/api/user/avatar',
+        url: apiUrl,
         filePath: tempFilePaths[0],
         name: 'file',
         header: {
@@ -186,34 +189,28 @@ const uploadAvatar = () => {
   })
 }
 
-const updateProfile = () => {
-  // 调用API更新用户资料
-  uni.request({
-    url: '/api/user/update',
-    method: 'POST',
-    header: {
-      'Authorization': `Bearer ${userStore.getToken}`
-    },
-    data: {
+const updateProfile = async () => {
+  try {
+    const response = await post('/user/update', {
       nickname: formData.nickname,
       email: formData.email,
       phone: formData.phone
-    },
-    success: (res) => {
-      if (res.data.code === 200) {
-        // 更新本地存储的用户信息
-        const updatedUserInfo = { ...userInfo.value, ...formData }
-        userStore.setUserInfo(updatedUserInfo)
-        uni.showToast({ title: '资料更新成功', icon: 'success' })
-        isEditMode.value = false
-      } else {
-        uni.showToast({ title: res.data.message || '资料更新失败', icon: 'none' })
-      }
-    },
-    fail: () => {
-      uni.showToast({ title: '网络错误，资料更新失败', icon: 'none' })
+    }, {
+      'Authorization': `Bearer ${userStore.getToken}`
+    })
+
+    if (response.code === 200) {
+      // 更新本地存储的用户信息
+      const updatedUserInfo = { ...userInfo.value, ...formData }
+      userStore.setUserInfo(updatedUserInfo)
+      uni.showToast({ title: '资料更新成功', icon: 'success' })
+      isEditMode.value = false
+    } else {
+      uni.showToast({ title: response.message || '资料更新失败', icon: 'none' })
     }
-  })
+  } catch (error) {
+    uni.showToast({ title: '网络错误，资料更新失败', icon: 'none' })
+  }
 }
 
 const showDeleteDialog = () => {
@@ -224,33 +221,30 @@ const closeDeleteDialog = () => {
   isDeleteDialogVisible.value = false
 }
 
-const confirmDeleteAccount = () => {
-  // 调用API注销账户
-  uni.request({
-    url: '/api/user/delete',
-    method: 'POST',
-    header: {
+const confirmDeleteAccount = async () => {
+  try {
+    const response = await post('/user/delete', {}, {
       'Authorization': `Bearer ${userStore.getToken}`
-    },
-    success: (res) => {
-      if (res.data.code === 200) {
-        // 清除用户信息
-        userStore.logout()
-        uni.showToast({ title: '账户注销成功', icon: 'success' })
-        // 跳转到登录页面
-        setTimeout(() => {
-          uni.navigateTo({
-            url: '/pages/login/login'
-          })
-        }, 1500)
-      } else {
-        uni.showToast({ title: res.data.message || '账户注销失败', icon: 'none' })
-      }
-    },
-    fail: () => {
-      uni.showToast({ title: '网络错误，账户注销失败', icon: 'none' })
+    })
+
+    if (response.code === 200) {
+      // 清除用户信息
+      userStore.logout()
+      uni.showToast({ title: '账户注销成功', icon: 'success' })
+      // 跳转到登录页面
+      setTimeout(() => {
+        uni.navigateTo({
+          url: '/pages/login/login'
+        })
+      }, 1500)
+    } else {
+      uni.showToast({ title: response.message || '账户注销失败', icon: 'none' })
     }
-  })
+  } catch (error) {
+    uni.showToast({ title: '网络错误，账户注销失败', icon: 'none' })
+  } finally {
+    isDeleteDialogVisible.value = false
+  }
 }
 
 const showChangePasswordDialog = () => {
@@ -265,7 +259,7 @@ const closeChangePasswordDialog = () => {
   passwordData.confirmPassword = ''
 }
 
-const changePassword = () => {
+const changePassword = async () => {
   if (!passwordData.oldPassword) {
     uni.showToast({ title: '请输入当前密码', icon: 'none' })
     return
@@ -278,29 +272,23 @@ const changePassword = () => {
     uni.showToast({ title: '两次输入的密码不一致', icon: 'none' })
     return
   }
-  // 调用API修改密码
-  uni.request({
-    url: '/api/user/change-password',
-    method: 'POST',
-    header: {
-      'Authorization': `Bearer ${userStore.getToken}`
-    },
-    data: {
+  try {
+    const response = await post('/user/change-password', {
       oldPassword: passwordData.oldPassword,
       newPassword: passwordData.newPassword
-    },
-    success: (res) => {
-      if (res.data.code === 200) {
-        uni.showToast({ title: '密码修改成功', icon: 'success' })
-        closeChangePasswordDialog()
-      } else {
-        uni.showToast({ title: res.data.message || '密码修改失败', icon: 'none' })
-      }
-    },
-    fail: () => {
-      uni.showToast({ title: '网络错误，密码修改失败', icon: 'none' })
+    }, {
+      'Authorization': `Bearer ${userStore.getToken}`
+    })
+
+    if (response.code === 200) {
+      uni.showToast({ title: '密码修改成功', icon: 'success' })
+      closeChangePasswordDialog()
+    } else {
+      uni.showToast({ title: response.message || '密码修改失败', icon: 'none' })
     }
-  })
+  } catch (error) {
+    uni.showToast({ title: '网络错误，密码修改失败', icon: 'none' })
+  }
 }
 
 const logout = () => {
@@ -425,7 +413,7 @@ onMounted(() => {
 
 .edit-profile-btn {
   padding: 8px 16px;
-  background-color: var(--primary-color);
+  background-color: #C2977F;
   color: white;
   border: none;
   border-radius: 20px;
@@ -436,7 +424,7 @@ onMounted(() => {
 }
 
 .edit-profile-btn:hover {
-  background-color: var(--secondary-color);
+  background-color: #94A7C8;
   transform: translateY(-1px);
 }
 
@@ -593,7 +581,7 @@ textarea {
 .submit-btn {
   width: 100%;
   padding: 12px;
-  background-color: var(--primary-color);
+  background-color: #C2977F;
   color: white;
   border: none;
   border-radius: 8px;
@@ -605,7 +593,7 @@ textarea {
 }
 
 .submit-btn:hover {
-  background-color: var(--secondary-color);
+  background-color: #94A7C8;
 }
 
 /* 联系方式显示 */

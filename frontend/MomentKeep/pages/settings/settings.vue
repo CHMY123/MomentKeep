@@ -196,6 +196,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
+import { post } from '../../utils/request'
 
 // 初始化用户store
 const userStore = useUserStore()
@@ -314,12 +315,8 @@ const resetBackground = async () => {
   // 通知后端清空背景图片
   if (userStore.getToken) {
     try {
-      await uni.request({
-        url: '/api/user/background',
-        method: 'DELETE',
-        header: {
-          'Authorization': `Bearer ${userStore.getToken}`
-        }
+      await del('/user/background', {}, {
+        'Authorization': `Bearer ${userStore.getToken}`
       })
     } catch (error) {
       console.error('清空背景图片失败:', error)
@@ -496,20 +493,14 @@ const submitFeedback = async () => {
   const fullContent = `反馈类型：${typeLabel}\n反馈内容：${feedback.content}`
   
   try {
-    const response = await uni.request({
-      url: '/api/feedback',
-      method: 'POST',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`,
-        'Content-Type': 'application/json'
-      },
-      data: {
-        content: fullContent,
-        contact: feedback.contact
-      }
+    const response = await post('/feedback', {
+      content: fullContent,
+      contact: feedback.contact
+    }, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
     
-    if (response.statusCode === 200 && response.data.code === 200) {
+    if (response.code === 200) {
       uni.showToast({ title: '反馈提交成功', icon: 'success' })
       closeFeedbackDialog()
     } else {

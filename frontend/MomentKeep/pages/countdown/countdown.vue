@@ -60,18 +60,15 @@
             <input type="text" v-model="formData.title" placeholder="输入标题" />
             <textarea v-model="formData.description" placeholder="输入描述（可选）" rows="3" />
             <div class="date-picker">
-              <select v-model="formData.year" @change="updateDayOptions">
-                <option v-for="year in years" :key="year" :value="year">{{ year }}</option>
-              </select>
-              <span>年</span>
-              <select v-model="formData.month" @change="updateDayOptions">
-                <option v-for="month in 12" :key="month" :value="month">{{ month }}</option>
-              </select>
-              <span>月</span>
-              <select v-model="formData.day">
-                <option v-for="day in dayOptions" :key="day" :value="day">{{ day }}</option>
-              </select>
-              <span>日</span>
+              <picker :value="yearIndex" :range="years" @change="onYearChange">
+                <view class="picker-box">{{ formData.year }}年</view>
+              </picker>
+              <picker :value="monthIndex" :range="months" @change="onMonthChange">
+                <view class="picker-box">{{ formData.month }}月</view>
+              </picker>
+              <picker :value="dayIndex" :range="dayOptions" @change="onDayChange">
+                <view class="picker-box">{{ formData.day }}日</view>
+              </picker>
             </div>
             <div class="color-picker">
               <label class="color-label">选择颜色</label>
@@ -98,9 +95,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
+import { get, post, put, del } from '../../utils/request'
 import { useCache } from '../../utils/cache'
 
 const userStore = useUserStore()
@@ -133,8 +131,37 @@ for (let i = 1978; i <= 2035; i++) {
   years.push(i)
 }
 
+// 月份范围
+const months = []
+for (let i = 1; i <= 12; i++) {
+  months.push(i)
+}
+
+// picker索引
+const yearIndex = ref(years.indexOf(new Date().getFullYear()))
+const monthIndex = ref(new Date().getMonth())
+const dayIndex = ref(new Date().getDate() - 1)
+
 // 日期选项
 const dayOptions = ref([])
+
+// picker选择处理
+const onYearChange = (e) => {
+  yearIndex.value = e.detail.value
+  formData.year = years[e.detail.value]
+  updateDayOptions()
+}
+
+const onMonthChange = (e) => {
+  monthIndex.value = e.detail.value
+  formData.month = months[e.detail.value]
+  updateDayOptions()
+}
+
+const onDayChange = (e) => {
+  dayIndex.value = e.detail.value
+  formData.day = dayOptions.value[e.detail.value]
+}
 
 // 更新日期选项
 const updateDayOptions = () => {
@@ -211,15 +238,12 @@ const fetchCountdowns = async () => {
       return []
     }
 
-    const response = await uni.request({
-      url: '/api/countdown',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
+    const response = await get('/countdown', {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
     })
 
-    if (response.statusCode === 200 && response.data.code === 200) {
-      const data = response.data.data || []
+    if (response.code === 200) {
+      const data = response.data || []
       return data.map(countdown => {
         const timeLeft = calculateTimeLeft(countdown.targetTime)
         return {
@@ -298,28 +322,32 @@ const saveCountdownWithTargetDate = async (targetDate) => {
   }
   
   try {
-    const url = isEdit.value ? '/api/countdown' : '/api/countdown'
-    const method = isEdit.value ? 'PUT' : 'POST'
-    
-    const response = await uni.request({
-      url: url,
-      method: method,
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`,
-        'Content-Type': 'application/json'
-      },
-      data: {
+    let response
+    if (isEdit.value) {
+      response = await put('/countdown', {
         id: formData.id,
         title: formData.title,
         description: formData.description,
         targetTime: targetDate.toISOString(),
         color: formData.color,
         userId: 1 // 暂时硬编码
-      }
-    })
+      }, {
+        'Authorization': `Bearer ${userStore.getToken}`
+      })
+    } else {
+      response = await post('/countdown', {
+        title: formData.title,
+        description: formData.description,
+        targetTime: targetDate.toISOString(),
+        color: formData.color,
+        userId: 1 // 暂时硬编码
+      }, {
+        'Authorization': `Bearer ${userStore.getToken}`
+      })
+    }
     
-    if (response.statusCode === 200 && response.data.code === 200) {
-      const newCountdown = response.data.data
+    if (response.code === 200) {
+      const newCountdown = response.data
       const timeLeft = calculateTimeLeft(newCountdown.targetTime)
       const countdownWithTime = {
         ...newCountdown,
@@ -340,7 +368,7 @@ const saveCountdownWithTargetDate = async (targetDate) => {
       
       closeCountdownDialog()
       uni.showToast({ title: isEdit.value ? '倒计时更新成功' : '倒计时添加成功', icon: 'success' })
-    } else if (response.statusCode === 403) {
+    } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
       setTimeout(() => {
         uni.navigateTo({ url: '/pages/login/login' })
@@ -412,21 +440,17 @@ const deleteCountdown = (id) => {
     success: async (res) => {
       if (res.confirm) {
         try {
-          const response = await uni.request({
-            url: `/api/countdown/${id}`,
-            method: 'DELETE',
-            header: {
-              'Authorization': `Bearer ${userStore.getToken}`
-            }
+          const response = await del(`/countdown/${id}`, {}, {
+            'Authorization': `Bearer ${userStore.getToken}`
           })
           
-          if (response.statusCode === 200 && response.data.code === 200) {
+          if (response.code === 200) {
             const index = countdowns.value.findIndex(c => c.id === id)
             if (index !== -1) {
               countdowns.value.splice(index, 1)
             }
             uni.showToast({ title: '倒计时删除成功', icon: 'success' })
-          } else if (response.statusCode === 403) {
+          } else if (response.code === 403) {
             uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
             setTimeout(() => {
               uni.navigateTo({ url: '/pages/login/login' })
@@ -734,24 +758,23 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 
-.date-picker select {
+.date-picker picker {
+  flex: 1;
+  max-width: 100px;
+  margin: 0 4px;
+}
+
+.date-picker picker:first-child {
+  margin-left: 0;
+}
+
+.picker-box {
   padding: 10px;
   border: 1px solid #D8C8BE;
   border-radius: 8px;
   font-size: 14px;
-  margin-right: 8px;
-  margin-left: 8px;
-  width: 80px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-.date-picker select:first-child {
-  margin-left: 0;
-}
-
-.date-picker span {
-  font-size: 14px;
-  color: #333333;
+  background-color: #FFFFFF;
+  text-align: center;
 }
 
 .modal-body textarea {
