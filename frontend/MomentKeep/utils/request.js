@@ -10,7 +10,9 @@ const API_CONFIG = {
   // 开发环境（H5）
   development: '/api',
   // 微信小程序环境
-  'mp-weixin': 'http://localhost:8080/api'
+  'mp-weixin': 'http://localhost:8080/api',
+  // APP环境
+  app: 'http://10.252.41.76:8080/api'
 }
 
 /**
@@ -18,17 +20,19 @@ const API_CONFIG = {
  * @returns {string} API基础URL
  */
 const getApiBaseUrl = () => {
-  // 检测当前环境
-  try {
-    // 微信小程序环境
-    if (typeof wx !== 'undefined') {
-      return API_CONFIG['mp-weixin']
-    }
-  } catch (e) {
-    console.error('环境检测失败:', e)
-  }
-  // 默认返回开发环境
-  return API_CONFIG.development
+  // #ifdef APP-PLUS
+  return API_CONFIG.app;
+  // #endif
+
+  // #ifdef MP-WEIXIN
+  return API_CONFIG['mp-weixin'];
+  // #endif
+
+  // #ifdef H5
+  return API_CONFIG.development;
+  // #endif
+  
+  return API_CONFIG.development;
 }
 
 /**

@@ -1,5 +1,6 @@
 package cn.edu.scnu.momentkeep.service.impl;
 
+import cn.edu.scnu.momentkeep.common.BusinessException;
 import cn.edu.scnu.momentkeep.entity.Todo;
 import cn.edu.scnu.momentkeep.mapper.TodoMapper;
 import cn.edu.scnu.momentkeep.service.TodoService;
@@ -37,7 +38,11 @@ public class TodoServiceImpl implements TodoService {
 
     @Override
     public Todo getTodoById(Long id) {
-        return todoMapper.selectById(id);
+        Todo todo = todoMapper.selectById(id);
+        if (todo == null) {
+            throw new BusinessException("待办事项不存在");
+        }
+        return todo;
     }
 
     @Override

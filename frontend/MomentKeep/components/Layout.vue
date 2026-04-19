@@ -333,6 +333,12 @@ const handleBackgroundUpdate = (event) => {
   }
 }
 
+// 处理主题更新事件
+const handleThemeUpdate = (event) => {
+  // 主题更新事件处理，确保Layout组件响应主题变化
+  console.log('主题已更新:', event.detail)
+}
+
 // 生命周期
 onMounted(async () => {
   updateBackgroundStyle()
@@ -359,6 +365,7 @@ onMounted(async () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', checkMobile)
     window.addEventListener('background-updated', handleBackgroundUpdate)
+    window.addEventListener('theme-updated', handleThemeUpdate)
   }
 })
 
@@ -387,6 +394,7 @@ onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', checkMobile)
     window.removeEventListener('background-updated', handleBackgroundUpdate)
+    window.removeEventListener('theme-updated', handleThemeUpdate)
   }
 })
 </script>
@@ -444,17 +452,17 @@ onUnmounted(() => {
 /* 侧边栏样式 */
 .sidebar {
   width: 240px;
-  background: rgba(242, 238, 232, 0.8);
+  background: var(--sidebar-bg, rgba(242, 238, 232, 0.8));
   backdrop-filter: blur(10px);
   box-shadow: 1px 0 4px rgba(0, 0, 0, 0.1);
-  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  border-right: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
   transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   display: flex;
   flex-direction: column;
   padding-top: 20px;
   position: relative;
   z-index: 99;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .sidebar-active {
@@ -468,7 +476,7 @@ onUnmounted(() => {
   left: 20px;
   width: 44px;
   height: 44px;
-  background-color: #C2977F;
+  background-color: var(--primary-color, #C2977F);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -480,7 +488,7 @@ onUnmounted(() => {
 }
 
 .floating-toggle-btn:hover {
-  background-color: #94A7C8;
+  background-color: var(--secondary-color, #94A7C8);
   transform: scale(1.05);
 }
 
@@ -569,7 +577,7 @@ onUnmounted(() => {
 .user-name {
   font-size: 16px;
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .menu-list {
@@ -709,7 +717,7 @@ onUnmounted(() => {
 }
 
 .menu-text-active {
-  color: #C2977F;
+  color: var(--primary-color, #C2977F);
   font-weight: 500;
 }
 
@@ -720,7 +728,7 @@ onUnmounted(() => {
   flex-direction: column;
   transition: all 0.3s ease;
   background: transparent;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .header {
@@ -728,9 +736,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   padding: 0 20px;
-  background: rgba(242, 238, 232, 0.8);
+  background: var(--sidebar-bg, rgba(242, 238, 232, 0.8));
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
   position: sticky;
   top: 0;
   z-index: 10;
@@ -741,7 +749,7 @@ onUnmounted(() => {
   flex: 1;
   font-size: 18px;
   font-weight: 600;
-  color: #C2977F;
+  color: var(--primary-color, #C2977F);
 }
 
 .header-right {

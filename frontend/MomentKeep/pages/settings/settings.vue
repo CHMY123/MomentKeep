@@ -196,7 +196,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
-import { post } from '../../utils/request'
+import { post, del } from '../../utils/request'
 
 // 初始化用户store
 const userStore = useUserStore()
@@ -365,8 +365,22 @@ const applyTheme = (index) => {
   }
   
   const theme = themes[index]
-  for (const [key, value] of Object.entries(theme)) {
-    document.documentElement.style.setProperty(key, value)
+  if (!theme) return
+  
+  // 确保在浏览器环境中
+  if (typeof document !== 'undefined') {
+    for (const [key, value] of Object.entries(theme)) {
+      document.documentElement.style.setProperty(key, value)
+    }
+    
+    // 通知Layout组件主题已更新
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('theme-updated', {
+        detail: {
+          themeIndex: index
+        }
+      }))
+    }
   }
 }
 

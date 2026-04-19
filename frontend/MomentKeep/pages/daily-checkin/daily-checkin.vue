@@ -181,46 +181,6 @@
         </div>
       </div>
 
-      <!-- 时间分布图表 -->
-      <div class="chart-section">
-        <div class="section-title">时间分布</div>
-        <div class="chart-controls">
-          <picker :value="checkinTypeIndex" :range="checkinTypeOptions" range-key="label" @change="onCheckinTypeChange">
-            <view class="picker-box">
-              {{ checkinTypeOptions[checkinTypeIndex].label }}
-            </view>
-          </picker>
-          <picker v-if="(selectedCheckinType === 'meal' || selectedCheckinType === 'exercise')" :value="subTypeIndex" :range="subTypeOptions" range-key="label" @change="onSubTypeChange">
-            <view class="picker-box">
-              {{ subTypeOptions[subTypeIndex].label }}
-            </view>
-          </picker>
-        </div>
-        <div class="time-distribution-chart">
-          <scroll-view scroll-x="true" class="chart-scroll-container" show-scrollbar="false">
-            <div v-if="timeDistribution && timeDistribution.length > 0" class="chart-container">
-              <div class="chart-axes">
-                <div class="y-axis">
-                  <div v-for="(label, index) in yAxisLabels" :key="index" class="axis-label">{{ label }}</div>
-                </div>
-                <div class="chart-bars">
-                  <div v-for="(item, index) in timeDistribution" :key="index" class="chart-bar">
-                    <div class="bar-value">{{ item.count }}</div>
-                    <div class="bar-container">
-                      <div class="bar-fill" :style="{ height: maxCount > 0 ? (item.count || 0) / maxCount * 100 + '%' : '0%' }"></div>
-                    </div>
-                    <div class="bar-label">{{ formatTimeRange(item.timeRange) }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="empty-chart">
-              暂无数据
-            </div>
-          </scroll-view>
-        </div>
-      </div>
-      
       <!-- 自定义用餐类型弹窗 -->
       <div class="modal" v-if="isCustomMealDialogOpen">
         <div class="modal-content">
@@ -268,11 +228,14 @@
 import { ref, computed, onMounted, watch, reactive } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
-import { get, post } from '../../utils/request'
+import { get, post, put, del } from '../../utils/request'
 import { useCache } from '../../utils/cache'
 
 const userStore = useUserStore()
 const { getCache, setCache, removeCache, fetchWithCache } = useCache()
+
+// 图表滚动容器引用
+const chartScrollView = ref(null)
 
 // 打卡状态
 const checkins = reactive({
@@ -303,24 +266,6 @@ const stats = reactive({
   mealCount: 0,
   exerciseRate: 0
 })
-
-// 时间分布相关
-const selectedCheckinType = ref('early')
-const selectedSubType = ref('all')
-const timeDistribution = ref([])
-const maxCount = ref(6)
-const yAxisLabels = ref([])
-
-// 时间分布选择器相关
-const checkinTypeOptions = [
-  { label: '早起打卡', value: 'early' },
-  { label: '睡眠打卡', value: 'sleep' },
-  { label: '用餐打卡', value: 'meal' },
-  { label: '运动打卡', value: 'exercise' }
-]
-const checkinTypeIndex = ref(0)
-const subTypeOptions = ref([])
-const subTypeIndex = ref(0)
 
 // 加载状态
 const loading = ref(false)
@@ -735,143 +680,6 @@ const getSubTypes = (type) => {
  * 处理打卡类型选择变化
  * @param {Object} e - picker事件对象
  */
-const onCheckinTypeChange = (e) => {
-  const index = e.detail.value
-  checkinTypeIndex.value = index
-  selectedCheckinType.value = checkinTypeOptions[index].value
-
-  // 更新子类型选项
-  updateSubTypeOptions()
-  // 重新获取时间分布
-  fetchTimeDistribution()
-}
-
-/**
- * 更新子类型选项
- */
-const updateSubTypeOptions = () => {
-  if (selectedCheckinType.value === 'meal') {
-    subTypeOptions.value = [
-      { label: '全部类型', value: 'all' },
-      ...mealTypes.map(type => ({ label: type, value: type })),
-      { label: '其他类型', value: 'other' }
-    ]
-    subTypeIndex.value = 0
-    selectedSubType.value = 'all'
-  } else if (selectedCheckinType.value === 'exercise') {
-    subTypeOptions.value = [
-      { label: '全部类型', value: 'all' },
-      ...exerciseTypes.map(type => ({ label: type, value: type })),
-      { label: '其他类型', value: 'other' }
-    ]
-    subTypeIndex.value = 0
-    selectedSubType.value = 'all'
-  }
-}
-
-/**
- * 处理子类型选择变化
- * @param {Object} e - picker事件对象
- */
-const onSubTypeChange = (e) => {
-  const index = e.detail.value
-  subTypeIndex.value = index
-  selectedSubType.value = subTypeOptions.value[index].value
-  // 重新获取时间分布
-  fetchTimeDistribution()
-}
-
-// 获取时间分布数据
-const fetchTimeDistribution = async () => {
-  if (!userStore.getToken) {
-    return
-  }
-
-  try {
-    console.log('发送时间分布请求:', {
-      type: selectedCheckinType.value,
-      subType: selectedSubType.value
-    })
-    const response = await get('/checkin/time-distribution', {
-      type: selectedCheckinType.value,
-      subType: selectedSubType.value
-    }, {
-      'Authorization': `Bearer ${userStore.getToken}`
-    })
-
-    console.log('时间分布响应:', response)
-
-    if (response.code === 200) {
-      timeDistribution.value = response.data || []
-      console.log('时间分布数据:', timeDistribution.value)
-      
-      // 计算最大值并生成动态纵坐标
-      calculateDynamicYAxis()
-    } else {
-      console.error('时间分布请求失败:', response)
-      // 重置为默认值
-      maxCount.value = 6
-      generateYAxisLabels()
-    }
-  } catch (error) {
-    console.error('获取时间分布数据失败:', error)
-  }
-}
-
-// 计算动态纵坐标
-const calculateDynamicYAxis = () => {
-  if (!timeDistribution.value || timeDistribution.value.length === 0) {
-    maxCount.value = 6
-    generateYAxisLabels()
-    return
-  }
-  
-  // 找出最大值
-  const counts = timeDistribution.value.map(item => item.count || 0)
-  const max = Math.max(...counts)
-  
-  // 根据最大值动态调整尺度
-  if (max <= 5) {
-    maxCount.value = 5
-  } else if (max <= 10) {
-    maxCount.value = 10
-  } else if (max <= 20) {
-    maxCount.value = 20
-  } else if (max <= 50) {
-    maxCount.value = 50
-  } else {
-    // 对于更大的值，取最接近的10的倍数
-    maxCount.value = Math.ceil(max / 10) * 10
-  }
-  
-  generateYAxisLabels()
-}
-
-// 生成纵坐标标签
-const generateYAxisLabels = () => {
-  const labels = []
-  const step = maxCount.value / 5 // 5个刻度
-  
-  for (let i = 0; i <= 5; i++) {
-    labels.push(Math.round(step * i))
-  }
-  
-  yAxisLabels.value = labels
-}
-
-// 格式化时间范围显示
-const formatTimeRange = (timeRange) => {
-  if (!timeRange) return ''
-  // 假设timeRange格式为 "HH:MM-HH:MM"
-  const parts = timeRange.split('-')
-  if (parts.length !== 2) return timeRange
-  
-  const startHour = parseInt(parts[0].split(':')[0])
-  const endHour = parseInt(parts[1].split(':')[0])
-  
-  return `${startHour}时-${endHour}时`
-}
-
 // 取消特定的用餐打卡
 const cancelMealCheckin = async (index) => {
   // 检查是否登录
@@ -1112,16 +920,9 @@ onMounted(() => {
     return
   }
 
-  // 初始化纵坐标标签
-  generateYAxisLabels()
-
-  // 初始化子类型选项
-  updateSubTypeOptions()
-
   // 初始化数据（异步加载，不阻塞页面渲染）
   fetchCheckins()
   fetchCheckinStats()
-  fetchTimeDistribution()
 })
 </script>
 
@@ -1319,7 +1120,7 @@ onMounted(() => {
 }
 
 .checked-btn {
-  background-color: #C2977F;
+  background-color: var(--primary-color, #C2977F);
 }
 
 /* 用餐类型选择 */
@@ -1333,7 +1134,7 @@ onMounted(() => {
 .meal-type, .exercise-type {
   padding: 8px 12px;
   background-color: white;
-  border: 1px solid #D8C8BE;
+  border: 1px solid var(--sidebar-border, #D8C8BE);
   border-radius: 6px;
   text-align: center;
   cursor: pointer;
@@ -1343,13 +1144,13 @@ onMounted(() => {
 }
 
 .meal-type:hover, .exercise-type:hover {
-  border-color: #C2977F;
-  color: #C2977F;
+  border-color: var(--primary-color, #C2977F);
+  color: var(--primary-color, #C2977F);
 }
 
 .meal-type.selected, .exercise-type.selected {
-  border-color: #C2977F;
-  color: #C2977F;
+  border-color: var(--primary-color, #C2977F);
+  color: var(--primary-color, #C2977F);
   background-color: rgba(194, 151, 127, 0.1);
   font-weight: 500;
 }
@@ -1360,7 +1161,7 @@ onMounted(() => {
 
 /* 数据统计 */
 .stats-section {
-  background-color: #F2EEE8;
+  background-color: var(--sidebar-bg, #F2EEE8);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -1369,9 +1170,9 @@ onMounted(() => {
 .section-title {
   font-size: 16px;
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin-bottom: 16px;
-  border-bottom: 1px solid #94A7C8;
+  border-bottom: 1px solid var(--secondary-color, #94A7C8);
   padding-bottom: 8px;
 }
 
@@ -1397,7 +1198,7 @@ onMounted(() => {
 .stat-value {
   font-size: 20px;
   font-weight: 600;
-  color: #C2977F;
+  color: var(--primary-color, #C2977F);
   margin-bottom: 8px;
 }
 
@@ -1410,192 +1211,9 @@ onMounted(() => {
 
 .chart-bar {
   height: 100%;
-  background-color: #C2977F;
+  background-color: var(--primary-color, #C2977F);
   border-radius: 4px;
   transition: width 0.5s ease;
-}
-
-/* 时间分布图表样式 */
-.chart-section {
-  background-color: #F2EEE8;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  margin-bottom: 20px;
-}
-
-.chart-controls {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
-.chart-controls picker {
-  flex: 1;
-  min-width: 150px;
-}
-
-.picker-box {
-  padding: 8px 12px;
-  border: 1px solid #E8D5C4;
-  border-radius: 6px;
-  background-color: #FFFFFF;
-  font-size: 14px;
-  color: #333333;
-}
-
-.time-distribution-chart {
-  margin-top: 20px;
-  width: 100%;
-  overflow: hidden;
-  position: relative;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.chart-scroll-container {
-  padding-bottom: 80px;
-  max-height: 450px;
-  position: relative;
-  width: 100%;
-  white-space: nowrap;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-.chart-container {
-  height: 450px;
-  margin-top: 20px;
-  vertical-align: top;
-  width: auto;
-  min-width: 100%;
-  display: inline-block;
-  box-sizing: border-box;
-}
-
-.chart-axes {
-  display: flex;
-  height: 100%;
-  align-items: flex-end;
-  padding-left: 40px;
-  padding-right: 20px;
-  position: relative;
-  box-sizing: border-box;
-}
-
-.y-axis {
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: space-between;
-  height: 100%;
-  margin-right: 10px;
-  width: 30px;
-  border-right: 1px solid #E8D5C4;
-  padding-right: 8px;
-}
-
-.axis-label {
-  font-size: 12px;
-  color: #999999;
-  text-align: right;
-  line-height: 20px;
-  z-index: 1;
-}
-
-.chart-bars {
-  display: flex;
-  align-items: flex-end;
-  flex: 1;
-  height: 100%;
-  gap: 15px;
-  padding-bottom: 80px;
-  position: relative;
-  overflow-y: hidden;
-}
-
-.chart-bars::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-color: #E8D5C4;
-}
-
-.chart-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 0 0 60px;
-  max-width: 60px;
-  position: relative;
-}
-
-.bar-container {
-  width: 100%;
-  flex: 1;
-  min-height: 20px;
-  background-color: #F2EEE8;
-  border-radius: 4px 4px 0 0;
-  overflow: hidden;
-  position: relative;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.bar-container:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.bar-fill {
-  width: 100%;
-  background: linear-gradient(to top, #C2977F, #E8D5C4);
-  border-radius: 4px 4px 0 0;
-  transition: height 0.3s ease;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.5);
-}
-
-.bar-value {
-  position: absolute;
-  top: -20px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #C2977F;
-  background-color: rgba(255, 255, 255, 0.9);
-  padding: 2px 6px;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.chart-bar:hover .bar-value {
-  opacity: 1;
-}
-
-.bar-label {
-  font-size: 12px;
-  color: #666666;
-  margin-top: 8px;
-  text-align: center;
-  white-space: nowrap;
-  width: 80px;
-  transform: rotate(-45deg);
-  transform-origin: center;
-  position: absolute;
-  bottom: -30px;
-}
-
-.empty-chart {
-  text-align: center;
-  padding: 40px 0;
-  color: #999999;
-  font-size: 14px;
 }
 
 /* 模态框样式 */

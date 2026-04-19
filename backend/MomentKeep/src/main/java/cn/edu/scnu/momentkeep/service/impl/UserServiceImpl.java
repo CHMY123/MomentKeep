@@ -308,12 +308,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     
     @Override
     public User getByUsername(String username) {
-        return userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
+        User user = userMapper.selectOne(new QueryWrapper<User>().eq("username", username));
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        return user;
     }
     
     @Override
     public User getCurrentUser() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            throw new BusinessException("无法获取当前用户信息");
+        }
+        Object principal = authentication.getPrincipal();
         String username = null;
         if (principal instanceof String) {
             username = (String) principal;

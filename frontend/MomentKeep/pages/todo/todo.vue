@@ -475,6 +475,7 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   margin-bottom: 20px;
+  align-items: center;
 }
 
 .add-todo input {
@@ -483,26 +484,29 @@ onMounted(() => {
   border: 1px solid #D8C8BE;
   border-radius: 8px;
   background-color: white;
-  font-size: 14px;
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
   color: #333333;
   box-sizing: border-box;
   line-height: 1.6;
-  min-height: 60px;
+  height: 44px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 .add-btn {
-  padding: 12px 20px;
+  padding: 0 20px;
   background-color: #C2977F;
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
   font-weight: 500;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 44px;
+  min-width: 80px;
+  text-align: center;
 }
 
 .add-btn:hover {
@@ -544,7 +548,7 @@ onMounted(() => {
 }
 
 .todo-icon {
-  font-size: 24px;
+  font-size: calc(var(--base-font-size) * 1.5); /* 24px */
   margin-right: 12px;
   color: #666666;
   cursor: pointer;
@@ -570,7 +574,7 @@ onMounted(() => {
 }
 
 .action-icon {
-  font-size: 20px;
+  font-size: calc(var(--base-font-size) * 1.25); /* 20px */
   cursor: pointer;
   transition: color 0.3s ease;
 }
@@ -613,7 +617,7 @@ onMounted(() => {
 }
 
 .todo-description {
-  font-size: 12px;
+  font-size: calc(var(--base-font-size) * 0.75); /* 12px */
   color: #999999;
   margin-top: 4px;
 }
@@ -637,7 +641,7 @@ onMounted(() => {
   text-align: center;
   padding: 40px 0;
   color: #999999;
-  font-size: 14px;
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
 }
 
 /* 模态框样式 */
@@ -671,14 +675,14 @@ onMounted(() => {
 }
 
 .modal-header h3 {
-  font-size: 16px;
+  font-size: var(--base-font-size); /* 16px */
   font-weight: 500;
   color: #333333;
   margin: 0;
 }
 
 .close-icon {
-  font-size: 24px;
+  font-size: calc(var(--base-font-size) * 1.5); /* 24px */
   cursor: pointer;
   color: #999999;
   transition: color 0.3s ease;
@@ -698,7 +702,7 @@ onMounted(() => {
   padding: 12px;
   border: 1px solid #D8C8BE;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
   margin-bottom: 12px;
   box-sizing: border-box;
   line-height: 1.6;
@@ -721,7 +725,7 @@ onMounted(() => {
   padding: 8px 16px;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -748,11 +752,16 @@ onMounted(() => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .add-todo {
-    flex-direction: column;
+    /* 保持水平排列 */
   }
   
   .add-btn {
-    padding: 12px;
+    padding: 0 16px;
+    min-width: 70px;
+  }
+  
+  .add-todo input {
+    padding: 10px 14px;
   }
 }
 </style>

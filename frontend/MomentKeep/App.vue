@@ -38,6 +38,7 @@ onMounted(() => {
   --text-color: #333333;
   --primary-color: #C2977F;
   --secondary-color: #94A7C8;
+  --base-font-size: 16px;
 }
 
 page, view, text, image, navigator, button, input, textarea, picker, picker-view {
@@ -48,6 +49,7 @@ page, view, text, image, navigator, button, input, textarea, picker, picker-view
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--base-font-size);
   background-color: var(--bg-color);
   color: var(--text-color);
   transition: all 0.3s ease;

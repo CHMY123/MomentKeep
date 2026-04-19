@@ -1,5 +1,6 @@
 package cn.edu.scnu.momentkeep.service.impl;
 
+import cn.edu.scnu.momentkeep.common.BusinessException;
 import cn.edu.scnu.momentkeep.entity.Countdown;
 import cn.edu.scnu.momentkeep.mapper.CountdownMapper;
 import cn.edu.scnu.momentkeep.service.CountdownService;
@@ -35,7 +36,11 @@ public class CountdownServiceImpl implements CountdownService {
 
     @Override
     public Countdown getCountdownById(Long id) {
-        return countdownMapper.selectById(id);
+        Countdown countdown = countdownMapper.selectById(id);
+        if (countdown == null) {
+            throw new BusinessException("倒计时不存在");
+        }
+        return countdown;
     }
 
     @Override
