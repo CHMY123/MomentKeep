@@ -751,10 +751,6 @@ onMounted(() => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .add-todo {
-    /* 保持水平排列 */
-  }
-  
   .add-btn {
     padding: 0 16px;
     min-width: 70px;

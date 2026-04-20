@@ -199,4 +199,14 @@ public class CheckinServiceImpl implements CheckinService {
         
         return result;
     }
+    
+    @Override
+    public List<Checkin> getHistoryCheckins(Long userId, int limit) {
+        LambdaQueryWrapper<Checkin> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Checkin::getUserId, userId)
+                .orderByDesc(Checkin::getCheckinTime)
+                .last("LIMIT " + limit);
+        
+        return checkinMapper.selectList(queryWrapper);
+    }
 }

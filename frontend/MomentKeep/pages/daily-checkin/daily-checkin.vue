@@ -181,6 +181,144 @@
         </div>
       </div>
 
+      <!-- 今日打卡时间分布 -->
+      <div class="time-distribution-section">
+        <div class="section-title">今日打卡时间分布</div>
+        <div class="distribution-card">
+          <div class="distribution-tagline">{{ distributionTagline }}</div>
+          <div class="time-slots">
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">清晨 (0-6点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="timeDistribution.morning.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in timeDistribution.morning" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+            
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">上午 (7-12点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="timeDistribution.midMorning.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in timeDistribution.midMorning" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+            
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">下午 (13-18点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="timeDistribution.afternoon.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in timeDistribution.afternoon" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+            
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">晚上 (19-24点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="timeDistribution.evening.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in timeDistribution.evening" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 历史打卡时间分布 -->
+      <div class="history-distribution-section">
+        <div class="section-title">历史打卡时间分布</div>
+        <div class="distribution-card">
+          <div class="distribution-tagline">{{ historyTagline }}</div>
+          <div class="time-slots">
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">清晨 (0-6点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="historyDistribution.morning.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in historyDistribution.morning" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+            
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">上午 (7-12点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="historyDistribution.midMorning.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in historyDistribution.midMorning" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+            
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">下午 (13-18点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="historyDistribution.afternoon.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in historyDistribution.afternoon" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+            
+            <div class="time-slot">
+              <div class="time-slot-header">
+                <div class="time-slot-title">晚上 (19-24点)</div>
+              </div>
+              <div class="time-slot-content">
+                <div v-if="historyDistribution.evening.length > 0" class="checkin-items">
+                  <div v-for="(item, index) in historyDistribution.evening" :key="index" class="checkin-item">
+                    <span class="checkin-type">{{ item.type }}</span>
+                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                  </div>
+                </div>
+                <div v-else class="empty-checkin">暂无打卡</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 自定义用餐类型弹窗 -->
       <div class="modal" v-if="isCustomMealDialogOpen">
         <div class="modal-content">
@@ -269,6 +407,352 @@ const stats = reactive({
 
 // 加载状态
 const loading = ref(false)
+
+// 时间分布数据
+const timeDistribution = computed(() => {
+  const distribution = {
+    morning: [], // 0-6点
+    midMorning: [], // 7-12点
+    afternoon: [], // 13-18点
+    evening: [] // 19-24点
+  }
+  
+  // 处理早起打卡
+  if (checkins.early && checkins.earlyTime) {
+    const hour = parseInt(checkins.earlyTime.split(':')[0])
+    if (hour >= 0 && hour < 7) {
+      distribution.morning.push({ type: '早起打卡', time: checkins.earlyTime })
+    } else if (hour >= 7 && hour < 13) {
+      distribution.midMorning.push({ type: '早起打卡', time: checkins.earlyTime })
+    } else if (hour >= 13 && hour < 19) {
+      distribution.afternoon.push({ type: '早起打卡', time: checkins.earlyTime })
+    } else {
+      distribution.evening.push({ type: '早起打卡', time: checkins.earlyTime })
+    }
+  }
+  
+  // 处理睡眠打卡
+  if (checkins.sleep && checkins.sleepTime) {
+    const hour = parseInt(checkins.sleepTime.split(':')[0])
+    if (hour >= 0 && hour < 7) {
+      distribution.morning.push({ type: '睡眠打卡', time: checkins.sleepTime })
+    } else if (hour >= 7 && hour < 13) {
+      distribution.midMorning.push({ type: '睡眠打卡', time: checkins.sleepTime })
+    } else if (hour >= 13 && hour < 19) {
+      distribution.afternoon.push({ type: '睡眠打卡', time: checkins.sleepTime })
+    } else {
+      distribution.evening.push({ type: '睡眠打卡', time: checkins.sleepTime })
+    }
+  }
+  
+  // 处理用餐打卡
+  for (const meal of checkins.meals) {
+    if (meal.time) {
+      const hour = parseInt(meal.time.split(':')[0])
+      const type = `用餐打卡 (${meal.type})`
+      if (hour >= 0 && hour < 7) {
+        distribution.morning.push({ type, time: meal.time })
+      } else if (hour >= 7 && hour < 13) {
+        distribution.midMorning.push({ type, time: meal.time })
+      } else if (hour >= 13 && hour < 19) {
+        distribution.afternoon.push({ type, time: meal.time })
+      } else {
+        distribution.evening.push({ type, time: meal.time })
+      }
+    }
+  }
+  
+  // 处理运动打卡
+  for (const exercise of checkins.exercises) {
+    if (exercise.time) {
+      const hour = parseInt(exercise.time.split(':')[0])
+      const type = `运动打卡 (${exercise.type})`
+      if (hour >= 0 && hour < 7) {
+        distribution.morning.push({ type, time: exercise.time })
+      } else if (hour >= 7 && hour < 13) {
+        distribution.midMorning.push({ type, time: exercise.time })
+      } else if (hour >= 13 && hour < 19) {
+        distribution.afternoon.push({ type, time: exercise.time })
+      } else {
+        distribution.evening.push({ type, time: exercise.time })
+      }
+    }
+  }
+  
+  return distribution
+})
+
+// 智能互动文案
+const distributionTagline = computed(() => {
+  // 统计总打卡次数
+  const totalCheckins = 
+    (checkins.early ? 1 : 0) + 
+    (checkins.sleep ? 1 : 0) + 
+    checkins.meals.length + 
+    checkins.exercises.length
+  
+  if (totalCheckins === 0) {
+    return '今天还没有打卡记录，慢慢来，让我们一起记录生活的美好瞬间吧～'
+  }
+  
+  // 早起打卡时间分析
+  let earlyHour = null
+  if (checkins.early && checkins.earlyTime) {
+    earlyHour = parseInt(checkins.earlyTime.split(':')[0])
+  }
+  
+  // 睡眠打卡时间分析
+  let sleepHour = null
+  if (checkins.sleep && checkins.sleepTime) {
+    sleepHour = parseInt(checkins.sleepTime.split(':')[0])
+  }
+  
+  // 用餐打卡分布分析
+  const mealHours = checkins.meals.map(meal => {
+    if (meal.time) {
+      return parseInt(meal.time.split(':')[0])
+    }
+    return null
+  }).filter(hour => hour !== null)
+  
+  // 运动打卡时间分析
+  const exerciseHours = checkins.exercises.map(exercise => {
+    if (exercise.time) {
+      return parseInt(exercise.time.split(':')[0])
+    }
+    return null
+  }).filter(hour => hour !== null)
+  
+  // 早起打卡集中在6-8点
+  if (earlyHour >= 6 && earlyHour < 8) {
+    return '自律的清晨时光，为你的一天注入满满活力，真棒！'
+  }
+  
+  // 睡眠打卡在22点后
+  if (sleepHour >= 22 || sleepHour < 1) {
+    return '早睡早起身体好，你已经养成了健康的作息习惯，继续保持！'
+  }
+  
+  // 用餐打卡分布均匀
+  if (mealHours.length >= 3) {
+    const hasMorningMeal = mealHours.some(hour => hour >= 6 && hour < 12)
+    const hasAfternoonMeal = mealHours.some(hour => hour >= 12 && hour < 18)
+    const hasEveningMeal = mealHours.some(hour => hour >= 18 || hour < 1)
+    
+    if (hasMorningMeal && hasAfternoonMeal && hasEveningMeal) {
+      return '饮食规律，好好吃饭，你的生活充满了仪式感～'
+    }
+  }
+  
+  // 运动集中在傍晚
+  if (exerciseHours.length > 0) {
+    const eveningExercises = exerciseHours.filter(hour => hour >= 17 && hour < 22)
+    if (eveningExercises.length === exerciseHours.length) {
+      return '傍晚运动，释放一天的压力，活力满满的你最棒！'
+    }
+  }
+  
+  // 整体打卡时间分散
+  const allHours = []
+  if (earlyHour !== null) allHours.push(earlyHour)
+  if (sleepHour !== null) allHours.push(sleepHour)
+  allHours.push(...mealHours)
+  allHours.push(...exerciseHours)
+  
+  if (allHours.length >= 4) {
+    const timeRanges = [
+      allHours.filter(h => h >= 0 && h < 7).length > 0,
+      allHours.filter(h => h >= 7 && h < 13).length > 0,
+      allHours.filter(h => h >= 13 && h < 19).length > 0,
+      allHours.filter(h => h >= 19 || h < 1).length > 0
+    ]
+    
+    if (timeRanges.filter(Boolean).length >= 3) {
+      return '生活充实，节奏丰富，每一刻都值得记录～'
+    }
+  }
+  
+  // 打卡较少
+  if (totalCheckins < 3) {
+    return '轻松生活，慢慢来也很好，享受属于自己的时光～'
+  }
+  
+  // 默认文案
+  return '每一天的打卡都是对生活的热爱，继续保持这份热情！'
+})
+
+// 历史打卡数据
+const historyCheckins = ref([])
+
+// 历史打卡时间分布
+const historyDistribution = computed(() => {
+  const distribution = {
+    morning: [], // 0-6点
+    midMorning: [], // 7-12点
+    afternoon: [], // 13-18点
+    evening: [] // 19-24点
+  }
+  
+  for (const checkin of historyCheckins.value) {
+    if (checkin.checkinTime) {
+      const checkinDate = new Date(checkin.checkinTime)
+      const hour = checkinDate.getHours()
+      const time = checkinDate.getHours().toString().padStart(2, '0') + ':' + checkinDate.getMinutes().toString().padStart(2, '0')
+      const date = checkinDate.getFullYear() + '-' + (checkinDate.getMonth() + 1).toString().padStart(2, '0') + '-' + checkinDate.getDate().toString().padStart(2, '0')
+      
+      let type = ''
+      switch (checkin.type) {
+        case 'early':
+          type = '早起打卡'
+          break
+        case 'sleep':
+          type = '睡眠打卡'
+          break
+        case 'meal':
+          type = `用餐打卡 (${checkin.mealType || ''})`
+          break
+        case 'exercise':
+          type = `运动打卡 (${checkin.exerciseType || ''})`
+          break
+        default:
+          type = '打卡'
+      }
+      
+      if (hour >= 0 && hour < 7) {
+        distribution.morning.push({ type, time, date })
+      } else if (hour >= 7 && hour < 13) {
+        distribution.midMorning.push({ type, time, date })
+      } else if (hour >= 13 && hour < 19) {
+        distribution.afternoon.push({ type, time, date })
+      } else {
+        distribution.evening.push({ type, time, date })
+      }
+    }
+  }
+  
+  return distribution
+})
+
+// 历史打卡智能文案
+const historyTagline = computed(() => {
+  const totalHistoryCheckins = historyCheckins.value.length
+  
+  if (totalHistoryCheckins === 0) {
+    return '还没有历史打卡记录，让我们开始记录生活的点滴吧～'
+  }
+  
+  // 分析历史打卡时间分布
+  const hours = historyCheckins.value.map(checkin => {
+    if (checkin.checkinTime) {
+      return new Date(checkin.checkinTime).getHours()
+    }
+    return null
+  }).filter(hour => hour !== null)
+  
+  // 统计各时段打卡次数
+  const morningCount = hours.filter(h => h >= 0 && h < 7).length
+  const midMorningCount = hours.filter(h => h >= 7 && h < 13).length
+  const afternoonCount = hours.filter(h => h >= 13 && h < 19).length
+  const eveningCount = hours.filter(h => h >= 19 || h < 1).length
+  
+  // 计算总打卡天数（去重）
+  const uniqueDays = new Set(
+    historyCheckins.value.map(checkin => {
+      if (checkin.checkinTime) {
+        const d = new Date(checkin.checkinTime)
+        return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()
+      }
+      return null
+    }).filter(Boolean)
+  )
+  const totalDays = uniqueDays.size
+  
+  // 规律作息分析
+  if (totalDays >= 7) {
+    const earlyMorningRate = morningCount / totalHistoryCheckins
+    const regularSleepRate = eveningCount / totalHistoryCheckins
+    
+    if (earlyMorningRate > 0.3) {
+      return '坚持早起的你，已经养成了规律的作息习惯，继续保持这份自律！'
+    }
+    
+    if (regularSleepRate > 0.4) {
+      return '规律的睡眠时间是健康的基础，你已经掌握了这项重要的生活技能～'
+    }
+  }
+  
+  // 坚持打卡分析
+  if (totalDays >= 14) {
+    return '连续打卡超过两周，你对生活的热爱和坚持令人钦佩，继续加油！'
+  }
+  
+  if (totalDays >= 7) {
+    return '一周的坚持打卡，你已经开始形成良好的习惯，再接再厉！'
+  }
+  
+  // 时间分布分析
+  const maxCount = Math.max(morningCount, midMorningCount, afternoonCount, eveningCount)
+  const maxRatio = maxCount / totalHistoryCheckins
+  
+  if (maxRatio > 0.6) {
+    if (maxCount === midMorningCount) {
+      return '上午是你最活跃的时段，充分利用这段时间，创造更多精彩！'
+    } else if (maxCount === afternoonCount) {
+      return '下午的你充满活力，继续保持这份积极的状态～'
+    } else if (maxCount === eveningCount) {
+      return '夜晚的时光你也不放松，充实的生活让每一天都更有意义！'
+    } else {
+      return '清晨的你最有活力，早起的鸟儿有虫吃，继续保持！'
+    }
+  }
+  
+  // 均衡分布
+  if (morningCount > 0 && midMorningCount > 0 && afternoonCount > 0 && eveningCount > 0) {
+    return '你的打卡时间分布均衡，生活节奏丰富多样，真是令人羡慕的状态！'
+  }
+  
+  // 默认文案
+  return `已经坚持打卡 ${totalDays} 天，每一次记录都是对生活的珍视，继续保持这份热情！`
+})
+
+// 获取历史打卡数据
+const fetchHistoryCheckins = async () => {
+  if (!userStore.getToken) {
+    console.log('未登录，无法获取历史打卡数据')
+    return
+  }
+  
+  const cacheKey = 'history_checkins'
+  
+  const fetchFn = async () => {
+    console.log('开始获取历史打卡数据')
+    try {
+      const response = await get('/checkin/history', { limit: 30 }, {
+        'Authorization': `Bearer ${userStore.getToken}`
+      })
+      
+      console.log('历史打卡数据响应:', response)
+      
+      if (response.code === 200) {
+        return response.data || []
+      }
+      console.log('响应码不是200:', response.code)
+      return []
+    } catch (error) {
+      console.error('API请求失败:', error)
+      return []
+    }
+  }
+  
+  try {
+    console.log('尝试从缓存获取历史打卡数据')
+    const data = await fetchWithCache(cacheKey, fetchFn, 3600000) // 缓存1小时
+    console.log('获取到的历史打卡数据:', data)
+    historyCheckins.value = data
+  } catch (error) {
+    console.error('获取历史打卡数据失败:', error)
+  }
+}
 
 /**
  * 获取当前日期字符串
@@ -813,26 +1297,26 @@ const fetchCheckins = async () => {
   const date = getCurrentDate()
   const cacheKey = getTodayCacheKey()
 
-  const fetchFn = async () => {
-    if (!userStore.getToken) {
-      return []
-    }
+  if (!userStore.getToken) {
+    updateCheckinsFromList([])
+    return
+  }
 
+  try {
     const response = await get(`/checkin/by-date?date=${date}`, {}, {
       'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
-      return response.data || []
+      const checkinData = response.data || []
+      updateCheckinsFromList(checkinData)
+      setCache(cacheKey, checkinData)
+    } else {
+      updateCheckinsFromList([])
     }
-    return []
-  }
-
-  try {
-    const data = await fetchWithCache(cacheKey, fetchFn)
-    updateCheckinsFromList(data)
   } catch (error) {
     console.error('获取打卡数据失败:', error)
+    updateCheckinsFromList([])
   }
 }
 
@@ -843,6 +1327,10 @@ const updateCheckinsFromList = (checkinList) => {
   checkins.sleepTime = ''
   checkins.meals = []
   checkins.exercises = []
+
+  if (!checkinList || !Array.isArray(checkinList)) {
+    return
+  }
 
   for (const checkin of checkinList) {
     const checkinTime = new Date(checkin.checkinTime)
@@ -923,6 +1411,7 @@ onMounted(() => {
   // 初始化数据（异步加载，不阻塞页面渲染）
   fetchCheckins()
   fetchCheckinStats()
+  fetchHistoryCheckins()
 })
 </script>
 
@@ -1214,6 +1703,102 @@ onMounted(() => {
   background-color: var(--primary-color, #C2977F);
   border-radius: 4px;
   transition: width 0.5s ease;
+}
+
+/* 时间分布模块样式 */
+.time-distribution-section {
+  background-color: var(--sidebar-bg, #F2EEE8);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 30px;
+}
+
+.distribution-card {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #E8D5C4;
+}
+
+.distribution-tagline {
+  font-size: 14px;
+  color: var(--primary-color, #C2977F);
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.4;
+  font-weight: 500;
+  padding: 10px 12px;
+  background-color: rgba(194, 151, 127, 0.1);
+  border-radius: 6px;
+}
+
+.time-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.time-slot {
+  border: 1px solid #E8D5C4;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #F8F6F2;
+}
+
+.time-slot-header {
+  background-color: #F2EEE8;
+  padding: 10px 14px;
+  border-bottom: 1px solid #E8D5C4;
+}
+
+.time-slot-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color, #333333);
+}
+
+.time-slot-content {
+  padding: 14px;
+}
+
+.checkin-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #FFFFFF;
+  border-radius: 4px;
+  border: 1px solid #E8D5C4;
+  font-size: 14px;
+}
+
+.checkin-type {
+  color: var(--text-color, #333333);
+  font-weight: 500;
+  flex: 1;
+}
+
+.checkin-time {
+  color: #666666;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.empty-checkin {
+  text-align: center;
+  color: #999999;
+  font-size: 14px;
+  padding: 12px 0;
+  font-style: italic;
 }
 
 /* 模态框样式 */

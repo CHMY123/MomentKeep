@@ -98,7 +98,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String token = jwtTokenProvider.generateToken(springUser);
         
         // 保存token到Redis
-        redisTemplate.opsForValue().set("token:" + token, user.getUsername());
+        if (user.getUsername() != null) {
+            redisTemplate.opsForValue().set("token:" + token, java.util.Objects.requireNonNull(user.getUsername()));
+        }
         
         // 构建响应
         LoginResponseVO response = new LoginResponseVO();

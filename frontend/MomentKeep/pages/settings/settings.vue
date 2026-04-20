@@ -49,23 +49,6 @@
             <div class="arrow-icon"></div>
           </div>
         </div>
-
-        <!-- 官方主题背景 -->
-        <div class="setting-item" style="display: none;">
-          <span class="setting-label">官方主题背景</span>
-          <div class="theme-backgrounds">
-            <div
-              v-for="(theme, index) in themeBackgrounds"
-              :key="index"
-              class="theme-background"
-              :class="{ 'selected': selectedTheme === index }"
-              @click="selectThemeBackground(index)"
-            >
-              <img :src="theme.image" :alt="theme.name" />
-              <span class="theme-name">{{ theme.name }}</span>
-            </div>
-          </div>
-        </div>
       </div>
       
       <!-- AI设置 -->
@@ -205,7 +188,6 @@ const userStore = useUserStore()
 const themeIndex = ref(0) // 0: 浅色, 1: 深色, 2: 柔和
 const fontSizeIndex = ref(0) // 0: 标准, 1: 偏大, 2: 偏小
 const backgroundImage = ref('')
-const selectedTheme = ref(0)
 
 // AI设置
 const aiAutoFill = ref(true)
@@ -228,27 +210,11 @@ const feedbackTypes = [
   { label: '其他', value: 'other' }
 ]
 
-// 官方主题背景
-const themeBackgrounds = [
-  {
-    name: '雾感森林',
-    image: '/static/background/Misty Forest.jpg'
-  },
-  {
-    name: '简约线条',
-    image: '/static/background/minimalist lines.png'
-  },
-  {
-    name: '温柔肌理',
-    image: '/static/background/gentle texture.jpg'
-  }
-]
-
 // 方法
 const changeTheme = (index) => {
   themeIndex.value = index
   // 保存到本地存储
-  localStorage.setItem('themeIndex', index.toString())
+  uni.setStorageSync('themeIndex', index.toString())
   // 应用主题
   applyTheme(index)
   uni.showToast({ title: '主题已更新', icon: 'success' })
@@ -257,7 +223,7 @@ const changeTheme = (index) => {
 const changeFontSize = (index) => {
   fontSizeIndex.value = index
   // 保存到本地存储
-  localStorage.setItem('fontSizeIndex', index.toString())
+  uni.setStorageSync('fontSizeIndex', index.toString())
   // 应用字体大小
   applyFontSize(index)
   uni.showToast({ title: '字体大小已更新', icon: 'success' })
@@ -271,7 +237,7 @@ const chooseBackground = () => {
     success: (res) => {
       // 上传图片到服务器
       uni.uploadFile({
-        url: '/api/user/background',
+        url: 'http://10.252.41.76:8080/api/user/background',
         filePath: res.tempFilePaths[0],
         name: 'file',
         header: {
@@ -284,12 +250,9 @@ const chooseBackground = () => {
               const backgroundUrl = data.data
               backgroundImage.value = backgroundUrl
               // 保存到本地存储
-              localStorage.setItem('backgroundImage', backgroundUrl)
+              uni.setStorageSync('backgroundImage', backgroundUrl)
               // 应用背景图片
               applyBackgroundImage(backgroundUrl)
-              // 清除官方主题背景
-              selectedTheme.value = -1
-              localStorage.setItem('selectedTheme', '-1')
               uni.showToast({ title: '背景图片已设置', icon: 'success' })
             } else {
               uni.showToast({ title: data.message || '背景图片上传失败', icon: 'none' })
@@ -308,9 +271,7 @@ const chooseBackground = () => {
 
 const resetBackground = async () => {
   backgroundImage.value = ''
-  selectedTheme.value = -1
-  localStorage.removeItem('backgroundImage')
-  localStorage.setItem('selectedTheme', '-1')
+  uni.removeStorageSync('backgroundImage')
   
   // 通知后端清空背景图片
   if (userStore.getToken) {
@@ -324,15 +285,6 @@ const resetBackground = async () => {
   }
   
   uni.showToast({ title: '已恢复默认背景', icon: 'success' })
-}
-
-const selectThemeBackground = (index) => {
-  selectedTheme.value = index
-  // 保存到本地存储
-  localStorage.setItem('selectedTheme', index.toString())
-  // 应用官方主题背景
-  applyThemeBackground(index)
-  uni.showToast({ title: '主题背景已更新', icon: 'success' })
 }
 
 // 应用主题
@@ -391,66 +343,42 @@ const applyFontSize = (index) => {
     1: '18px', // 偏大
     2: '14px'  // 偏小
   }
-  document.documentElement.style.setProperty('--base-font-size', sizes[index])
   
-  // 同时应用到 body
-  document.body.style.fontSize = sizes[index]
+  // 确保在浏览器环境中
+  if (typeof document !== 'undefined') {
+    document.documentElement.style.setProperty('--base-font-size', sizes[index])
+    
+    // 同时应用到 body
+    document.body.style.fontSize = sizes[index]
+  }
 }
 
 // 应用背景图片
 const applyBackgroundImage = (imageUrl) => {
   // 保存到本地存储
-  localStorage.setItem('backgroundImage', imageUrl)
-  // 清除官方主题背景
-  localStorage.setItem('selectedTheme', '-1')
+  uni.setStorageSync('backgroundImage', imageUrl)
 
-  // 立即更新背景样式
-  const backgroundLayer = document.querySelector('.background-layer')
-  if (backgroundLayer) {
-    backgroundLayer.style.backgroundImage = `url(${imageUrl})`
-    backgroundLayer.style.backgroundSize = 'cover'
-    backgroundLayer.style.backgroundPosition = 'center'
-    backgroundLayer.style.backgroundRepeat = 'no-repeat'
-  }
-
-  // 通知Layout组件背景已更新
-  window.dispatchEvent(new CustomEvent('background-updated', {
-    detail: {
-      type: 'custom',
-      image: imageUrl,
-      selectedTheme: -1
+  // 确保在浏览器环境中
+  if (typeof document !== 'undefined') {
+    // 立即更新背景样式
+    const backgroundLayer = document.querySelector('.background-layer')
+    if (backgroundLayer) {
+      backgroundLayer.style.backgroundImage = `url(${imageUrl})`
+      backgroundLayer.style.backgroundSize = 'cover'
+      backgroundLayer.style.backgroundPosition = 'center'
+      backgroundLayer.style.backgroundRepeat = 'no-repeat'
     }
-  }))
-}
 
-// 应用官方主题背景
-const applyThemeBackground = (index) => {
-  const theme = themeBackgrounds[index]
-  if (!theme || !theme.image) return
-
-  // 保存到本地存储
-  localStorage.setItem('selectedTheme', index.toString())
-  // 清除自定义背景图片
-  localStorage.removeItem('backgroundImage')
-
-  // 立即更新背景样式（与自上传背景逻辑一致）
-  const backgroundLayer = document.querySelector('.background-layer')
-  if (backgroundLayer) {
-    backgroundLayer.style.backgroundImage = `url(${theme.image})`
-    backgroundLayer.style.backgroundSize = 'cover'
-    backgroundLayer.style.backgroundPosition = 'center'
-    backgroundLayer.style.backgroundRepeat = 'no-repeat'
-  }
-
-  // 同时更新Layout组件的响应式数据
-  // 通知Layout组件背景已更新
-  window.dispatchEvent(new CustomEvent('background-updated', {
-    detail: {
-      type: 'theme',
-      image: theme.image,
-      selectedTheme: index
+    // 通知Layout组件背景已更新
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('background-updated', {
+        detail: {
+          type: 'custom',
+          image: imageUrl
+        }
+      }))
     }
-  }))
+  }
 }
 
 const toggleAIAutoFill = (event) => {
@@ -529,10 +457,9 @@ const submitFeedback = async () => {
 // 生命周期
 onMounted(() => {
   // 从本地存储加载设置
-  const savedThemeIndex = localStorage.getItem('themeIndex')
-  const savedFontSizeIndex = localStorage.getItem('fontSizeIndex')
-  const savedBackgroundImage = localStorage.getItem('backgroundImage')
-  const savedSelectedTheme = localStorage.getItem('selectedTheme')
+  const savedThemeIndex = uni.getStorageSync('themeIndex')
+  const savedFontSizeIndex = uni.getStorageSync('fontSizeIndex')
+  const savedBackgroundImage = uni.getStorageSync('backgroundImage')
   
   // 应用保存的设置
   if (savedThemeIndex !== null) {
@@ -550,12 +477,6 @@ onMounted(() => {
   if (savedBackgroundImage !== null) {
     backgroundImage.value = savedBackgroundImage
     applyBackgroundImage(savedBackgroundImage)
-  }
-  
-  if (savedSelectedTheme !== null) {
-    const index = parseInt(savedSelectedTheme)
-    selectedTheme.value = index
-    applyThemeBackground(index)
   }
 })
 </script>

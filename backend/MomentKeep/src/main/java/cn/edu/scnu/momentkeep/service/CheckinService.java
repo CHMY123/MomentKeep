@@ -35,4 +35,9 @@ public interface CheckinService {
      * 获取打卡时间分布
      */
     List<Map<String, Object>> getTimeDistribution(Long userId, String type, String subType);
+    
+    /**
+     * 获取历史打卡记录
+     */
+    List<Checkin> getHistoryCheckins(Long userId, int limit);
 }

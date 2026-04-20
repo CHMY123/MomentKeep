@@ -203,6 +203,7 @@ const fetchCheckinStats = async () => {
 
   try {
     const checkinList = await fetchFn()
+    console.log('打卡数据:', checkinList)
     setCache(cacheKey, checkinList)
 
     checkinStats.value = {

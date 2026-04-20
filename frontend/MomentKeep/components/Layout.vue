@@ -11,7 +11,7 @@
     ></div>
     
     <!-- 侧边栏 -->
-    <div class="sidebar" :class="{ 'sidebar-active': isSidebarOpen, 'sidebar-mobile': isMobile }">
+    <div class="sidebar" :class="{ 'sidebar-active': isSidebarOpen, 'sidebar-mobile': isMobile }" :style="{ paddingTop: isMobile ? (20 + safeAreaTop) + 'px' : '20px' }">
       <div class="user-info">
         <div class="avatar" @click="navigateToProfile" :style="{ backgroundImage: `url(${userAvatar})` }"></div>
         <div class="user-name">{{ userName }}</div>
@@ -41,13 +41,22 @@
       <div class="hamburger-icon"></div>
     </div>
     
+    <!-- 悬浮聊天按钮 -->
+    <div 
+      v-if="isMobile && !isAIChatOpen"
+      class="floating-chat-btn"
+      @click="toggleAIChat"
+    >
+      <div class="chat-icon"></div>
+    </div>
+    
     <!-- 主内容区域 -->
     <div class="main-content" :class="{ 'main-content-active': isSidebarOpen && !isMobile }">
-      <div class="header">
+      <div class="header" :style="{ paddingTop: isMobile ? safeAreaTop + 'px' : '0', height: isMobile ? (56 + safeAreaTop) + 'px' : '56px' }">
         <div v-if="!isMobile" class="menu-icon sidebar-icon" @click="toggleSidebar"></div>
         <div class="header-title">{{ currentPageTitle }}</div>
         <div class="header-right">
-          <div class="chat-icon" @click="toggleAIChat"></div>
+          <div v-if="!isMobile" class="chat-icon" @click="toggleAIChat"></div>
         </div>
       </div>
       
@@ -59,20 +68,20 @@
     
     <!-- AI聊天侧边栏 -->
     <div class="ai-sidebar" :class="{ 'ai-sidebar-active': isAIChatOpen }">
-      <div class="ai-header">
+      <div class="ai-header" :style="{ height: isMobile ? (48 + safeAreaTop) + 'px' : '48px', paddingTop: isMobile ? safeAreaTop + 'px' : '0' }">
         <span class="ai-title">AI助手</span>
         <div class="close-icon" @click="toggleAIChat">×</div>
       </div>
       <div class="ai-content">
         <div class="ai-message ai-message-bot">
-          <div class="ai-avatar" :style="{ backgroundImage: `url('/static/avatar/AI assistant.png')` }"></div>
+          <div class="ai-avatar" :style="{ backgroundImage: `url('https://momentkeep.s3.bitiful.net/avatars/AI%20assistant.png')` }"></div>
           <div class="ai-message-content">
             <span>你好！我是你的AI助手，有什么可以帮助你的吗？</span>
           </div>
         </div>
         <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.type === 'user' ? 'ai-message-user' : 'ai-message-bot'">
-          <div v-if="message.type === 'user'" class="ai-avatar" :style="{ backgroundImage: `url(${userAvatar})` }"></div>
-          <div v-else class="ai-avatar" :style="{ backgroundImage: `url('/static/avatar/AI assistant.png')` }"></div>
+          <div v-if="message.type === 'user'" class="ai-avatar" :style="{ backgroundImage: `url(${userAvatar || 'https://momentkeep.s3.bitiful.net/avatars/logo.png'})` }"></div>
+          <div v-else class="ai-avatar" :style="{ backgroundImage: `url('https://momentkeep.s3.bitiful.net/avatars/AI%20assistant.png')` }"></div>
           <div class="ai-message-content">
             <div v-if="message.loading" class="loading-indicator">
               <span class="loading-dot"></span>
@@ -83,7 +92,7 @@
           </div>
         </div>
       </div>
-      <div class="ai-input">
+      <div class="ai-input" :style="{ paddingBottom: isMobile ? '44px' : '0' }">
         <input type="text" v-model="aiInput" placeholder="输入你的问题..." />
         <button @click="sendAIMessage">发送</button>
       </div>
@@ -96,10 +105,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../store/user'
 import { useAppStore } from '../store/app'
 import { post, get } from '../utils/request'
+import { useCache } from '../utils/cache'
 import { marked } from 'marked'
 
 const userStore = useUserStore()
 const appStore = useAppStore()
+const { getCache, setCache, fetchWithCache } = useCache()
 
 const isSidebarOpen = ref(false) // 默认关闭侧边栏
 const isAIChatOpen = ref(false)
@@ -107,27 +118,22 @@ const aiMessages = ref([])
 const aiInput = ref('')
 const currentPageTitle = ref('朝暮记')
 const isMobile = ref(false)
+const statusBarHeight = ref(0) // 状态栏高度
+const safeAreaTop = ref(0) // 安全区域顶部高度
 
 const activeMenu = computed(() => appStore.activeMenu)
 
-const themeBackgrounds = [
-  { name: '雾感森林', image: '/static/background/Misty Forest.jpg' },
-  { name: '简约线条', image: '/static/background/minimalist lines.png' },
-  { name: '温柔肌理', image: '/static/background/gentle texture.jpg' }
-]
+
 
 const currentBackgroundStyle = ref({})
 
 const updateBackgroundStyle = () => {
   try {
     const backgroundImage = uni.getStorageSync('backgroundImage')
-    const selectedTheme = uni.getStorageSync('selectedTheme')
 
     let bgImage = ''
     if (backgroundImage) {
       bgImage = backgroundImage
-    } else if (selectedTheme !== null && parseInt(selectedTheme) >= 0 && parseInt(selectedTheme) < themeBackgrounds.length) {
-      bgImage = themeBackgrounds[parseInt(selectedTheme)].image
     }
 
     if (bgImage) {
@@ -264,20 +270,27 @@ const sendAIMessage = async () => {
 const loadChatHistory = async () => {
   if (!userStore.getToken) return
 
-  try {
+  const cacheKey = `ai_chat_history_${userStore.userInfo?.id || 'guest'}`
+
+  const fetchFn = async () => {
     const response = await get('/ai/history', {}, {
       'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200 && response.data) {
-      const history = response.data
-      aiMessages.value = []
-      for (const msg of history) {
-        if (msg.role === 'user') {
-          aiMessages.value.push({ type: 'user', content: msg.content })
-        } else if (msg.role === 'assistant') {
-          aiMessages.value.push({ type: 'bot', content: msg.content })
-        }
+      return response.data
+    }
+    return []
+  }
+
+  try {
+    const history = await fetchWithCache(cacheKey, fetchFn, 3600000) // 缓存1小时
+    aiMessages.value = []
+    for (const msg of history) {
+      if (msg.role === 'user') {
+        aiMessages.value.push({ type: 'user', content: msg.content })
+      } else if (msg.role === 'assistant') {
+        aiMessages.value.push({ type: 'bot', content: msg.content })
       }
     }
   } catch (error) {
@@ -292,13 +305,26 @@ const checkMobile = () => {
     const systemInfo = uni.getSystemInfoSync()
     // 小程序环境或屏幕宽度小于768px视为移动端
     isMobile.value = systemInfo.platform === 'devtools' || systemInfo.platform === 'mp-weixin' || systemInfo.screenWidth < 768
+    
+    // 获取状态栏高度和安全区域顶部高度
+    statusBarHeight.value = systemInfo.statusBarHeight || 0
+    if (systemInfo.safeArea && systemInfo.safeArea.top) {
+      safeAreaTop.value = systemInfo.safeArea.top || 0
+    } else {
+      safeAreaTop.value = statusBarHeight.value
+    }
   } catch (e) {
     // 降级方案：使用window对象
     if (typeof window !== 'undefined') {
       isMobile.value = window.innerWidth < 768
+      // 浏览器环境默认状态栏高度为0
+      statusBarHeight.value = 0
+      safeAreaTop.value = 0
     } else {
       // 默认视为移动端
       isMobile.value = true
+      statusBarHeight.value = 20 // 默认状态栏高度
+      safeAreaTop.value = 20 // 默认安全区域顶部高度
     }
   }
   // 移动端默认关闭侧边栏
@@ -311,17 +337,8 @@ const checkMobile = () => {
 
 // 处理背景更新事件
 const handleBackgroundUpdate = (event) => {
-  const { type, image, selectedTheme } = event.detail
-  if (type === 'theme' && image) {
-    currentBackgroundStyle.value = {
-      backgroundImage: `url(${image})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat'
-    }
-    uni.setStorageSync('selectedTheme', selectedTheme.toString())
-    uni.removeStorageSync('backgroundImage')
-  } else if (type === 'custom' && image) {
+  const { type, image } = event.detail
+  if (type === 'custom' && image) {
     currentBackgroundStyle.value = {
       backgroundImage: `url(${image})`,
       backgroundSize: 'cover',
@@ -329,7 +346,6 @@ const handleBackgroundUpdate = (event) => {
       backgroundRepeat: 'no-repeat'
     }
     uni.setStorageSync('backgroundImage', image)
-    uni.setStorageSync('selectedTheme', '-1')
   }
 }
 
@@ -472,7 +488,7 @@ onUnmounted(() => {
 /* 悬浮侧边栏切换按钮 */
 .floating-toggle-btn {
   position: fixed;
-  top: 20px;
+  top: 60px;
   left: 20px;
   width: 44px;
   height: 44px;
@@ -485,6 +501,9 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   z-index: 97;
   transition: all 0.3s ease;
+  /* 确保在小程序中固定显示 */
+  position: fixed !important;
+  z-index: 9999 !important;
 }
 
 .floating-toggle-btn:hover {
@@ -496,6 +515,32 @@ onUnmounted(() => {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-60px);
+}
+
+/* 悬浮聊天按钮 */
+.floating-chat-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  background-color: var(--primary-color, #C2977F);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 97;
+  transition: all 0.3s ease;
+  /* 确保在小程序中固定在屏幕底部 */
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+.floating-chat-btn:hover {
+  background-color: var(--secondary-color, #94A7C8);
+  transform: scale(1.05);
 }
 
 .hamburger-icon {
@@ -754,6 +799,7 @@ onUnmounted(() => {
 
 .header-right {
   cursor: pointer;
+  padding-right: 40px; /* 为微信小程序工具栏留出空间 */
 }
 
 .chat-icon {
@@ -781,6 +827,8 @@ onUnmounted(() => {
   flex-direction: column;
   z-index: 100;
   color: #333333;
+  box-sizing: border-box;
+  padding-bottom: 0;
 }
 
 .ai-sidebar-active {
@@ -788,7 +836,7 @@ onUnmounted(() => {
 }
 
 .ai-header {
-  height: 56px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -811,6 +859,7 @@ onUnmounted(() => {
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .ai-message {
@@ -872,13 +921,14 @@ onUnmounted(() => {
 }
 
 .ai-message-content {
-  flex: 1;
   max-width: 70%;
   padding: 10px 14px;
   border-radius: 16px;
   background-color: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   color: #333333;
+  align-self: flex-start;
+  word-wrap: break-word;
 }
 
 .ai-message-user .ai-message-content {
@@ -1020,6 +1070,10 @@ onUnmounted(() => {
   gap: 10px;
   min-height: 64px;
   box-sizing: border-box;
+  position: sticky;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
 }
 
 .ai-input input {

@@ -27,11 +27,12 @@ export const useCache = () => {
       const cacheData = uni.getStorageSync(CACHE_PREFIX + key)
       if (!cacheData) return null
 
-      const { data, timestamp } = cacheData
+      const { data, timestamp, expireTime } = cacheData
       const now = Date.now()
+      const effectiveExpireTime = expireTime || DEFAULT_CACHE_TIME
 
       // 检查缓存是否过期
-      if (now - timestamp > DEFAULT_CACHE_TIME) {
+      if (now - timestamp > effectiveExpireTime) {
         uni.removeStorageSync(CACHE_PREFIX + key)
         return null
       }

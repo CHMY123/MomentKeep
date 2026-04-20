@@ -119,4 +119,20 @@ public class CheckinController {
         List<Map<String, Object>> distribution = checkinService.getTimeDistribution(userId, type, subType);
         return Result.success(distribution);
     }
+    
+    /**
+     * 获取历史打卡记录
+     */
+    @GetMapping("/history")
+    public Result<List<Checkin>> getHistoryCheckins(
+            @RequestParam(required = false, defaultValue = "30") int limit,
+            Authentication authentication) {
+        // 获取当前用户ID
+        String username = authentication.getName();
+        User user = userService.getByUsername(username);
+        Long userId = user.getId();
+        
+        List<Checkin> historyCheckins = checkinService.getHistoryCheckins(userId, limit);
+        return Result.success(historyCheckins);
+    }
 }

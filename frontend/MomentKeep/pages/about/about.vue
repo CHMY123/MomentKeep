@@ -4,7 +4,7 @@
       <!-- 项目信息 -->
       <div class="about-section">
         <div class="logo-section">
-          <img src="../../static/logo.png" alt="朝暮记" class="logo" />
+          <img src="https://momentkeep.s3.bitiful.net/avatars/logo.png" alt="朝暮记" class="logo" />
           <span class="app-name">朝暮记</span>
           <span class="app-slogan">朝有目标，暮有记录</span>
         </div>
@@ -48,7 +48,7 @@
         <div class="developer-list">
           <div class="developer-item">
             <div class="developer-avatar">
-              <img src="../../static/avatar/developer.jpg" alt="赖文韬" @error="handleImageError" />
+              <img src="https://momentkeep.s3.bitiful.net/avatars/developer.jpg" alt="赖文韬" @error="handleImageError" />
             </div>
             <div class="developer-info">
               <span class="developer-name">赖文韬</span>
