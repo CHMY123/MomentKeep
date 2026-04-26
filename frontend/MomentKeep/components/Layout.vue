@@ -352,7 +352,6 @@ const handleBackgroundUpdate = (event) => {
 // 处理主题更新事件
 const handleThemeUpdate = (event) => {
   // 主题更新事件处理，确保Layout组件响应主题变化
-  console.log('主题已更新:', event.detail)
 }
 
 // 生命周期

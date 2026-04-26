@@ -58,7 +58,7 @@
             <div class="checkin-title">用餐打卡</div>
             <div class="checkin-status" v-if="checkins.meals.length > 0">已打卡 {{ checkins.meals.length }} 次</div>
           </div>
-          <div class="meal-types" v-if="checkins.meals.length === 0">
+          <div class="meal-types" v-if="checkins.meals.length === 0 || showAddMealType">
             <div 
               v-for="type in mealTypes" 
               :key="type"
@@ -83,13 +83,21 @@
               </button>
             </div>
           </div>
-          <div class="checkin-actions" v-if="checkins.meals.length > 0">
+          <div class="checkin-actions" v-if="checkins.meals.length > 0 && !showAddMealType">
             <button class="checkin-btn" @click="resetMealCheckin">
               再次打卡
             </button>
           </div>
           <button 
-            v-else
+            v-if="showAddMealType"
+            class="checkin-btn" 
+            @click="checkin('meal')"
+            :disabled="!selectedMealType"
+          >
+            打卡
+          </button>
+          <button 
+            v-if="!showAddMealType && checkins.meals.length === 0"
             class="checkin-btn" 
             @click="checkin('meal')"
             :disabled="!selectedMealType"
@@ -105,7 +113,7 @@
             <div class="checkin-title">运动打卡</div>
             <div class="checkin-status" v-if="checkins.exercises.length > 0">已打卡 {{ checkins.exercises.length }} 次</div>
           </div>
-          <div class="exercise-types" v-if="checkins.exercises.length === 0">
+          <div class="exercise-types" v-if="checkins.exercises.length === 0 || showAddExerciseType">
             <div 
               v-for="type in exerciseTypes" 
               :key="type"
@@ -130,13 +138,21 @@
               </button>
             </div>
           </div>
-          <div class="checkin-actions" v-if="checkins.exercises.length > 0">
+          <div class="checkin-actions" v-if="checkins.exercises.length > 0 && !showAddExerciseType">
             <button class="checkin-btn" @click="resetExerciseCheckin">
               再次打卡
             </button>
           </div>
           <button 
-            v-else
+            v-if="showAddExerciseType"
+            class="checkin-btn" 
+            @click="checkin('exercise')"
+            :disabled="!selectedExerciseType"
+          >
+            打卡
+          </button>
+          <button 
+            v-if="!showAddExerciseType && checkins.exercises.length === 0"
             class="checkin-btn" 
             @click="checkin('exercise')"
             :disabled="!selectedExerciseType"
@@ -146,41 +162,6 @@
         </div>
       </div>
       
-      <!-- 数据可视化 -->
-      <div class="stats-section">
-        <div class="section-title">打卡数据统计</div>
-        <div class="stats-cards">
-          <div class="stat-card">
-            <div class="stat-title">早起打卡</div>
-            <div class="stat-value">{{ stats.earlyRate }}%</div>
-            <div class="stat-chart">
-              <div class="chart-bar" :style="{ width: stats.earlyRate + '%' }"></div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-title">睡眠打卡</div>
-            <div class="stat-value">{{ stats.sleepRate }}%</div>
-            <div class="stat-chart">
-              <div class="chart-bar" :style="{ width: stats.sleepRate + '%' }"></div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-title">用餐打卡</div>
-            <div class="stat-value">{{ stats.mealCount }}次/天</div>
-            <div class="stat-chart">
-              <div class="chart-bar" :style="{ width: (stats.mealCount / 4) * 100 + '%' }"></div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-title">运动打卡</div>
-            <div class="stat-value">{{ stats.exerciseRate }}%</div>
-            <div class="stat-chart">
-              <div class="chart-bar" :style="{ width: stats.exerciseRate + '%' }"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- 今日打卡时间分布 -->
       <div class="time-distribution-section">
         <div class="section-title">今日打卡时间分布</div>
@@ -250,6 +231,41 @@
         </div>
       </div>
 
+      <!-- 数据可视化 -->
+      <div class="stats-section">
+        <div class="section-title">打卡数据统计</div>
+        <div class="stats-cards">
+          <div class="stat-card">
+            <div class="stat-title">早起打卡</div>
+            <div class="stat-value">{{ stats.earlyRate }}%</div>
+            <div class="stat-chart">
+              <div class="chart-bar" :style="{ width: stats.earlyRate + '%' }"></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">睡眠打卡</div>
+            <div class="stat-value">{{ stats.sleepRate }}%</div>
+            <div class="stat-chart">
+              <div class="chart-bar" :style="{ width: stats.sleepRate + '%' }"></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">用餐打卡</div>
+            <div class="stat-value">{{ stats.mealCount }}次/天</div>
+            <div class="stat-chart">
+              <div class="chart-bar" :style="{ width: (stats.mealCount / 4) * 100 + '%' }"></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">运动打卡</div>
+            <div class="stat-value">{{ stats.exerciseRate }}%</div>
+            <div class="stat-chart">
+              <div class="chart-bar" :style="{ width: stats.exerciseRate + '%' }"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 历史打卡时间分布 -->
       <div class="history-distribution-section">
         <div class="section-title">历史打卡时间分布</div>
@@ -261,10 +277,24 @@
                 <div class="time-slot-title">清晨 (0-6点)</div>
               </div>
               <div class="time-slot-content">
-                <div v-if="historyDistribution.morning.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in historyDistribution.morning" :key="index" class="checkin-item">
-                    <span class="checkin-type">{{ item.type }}</span>
-                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                <div v-if="historyDistribution.morning.length > 0">
+                  <div v-for="(typeGroup, type) in groupByType(historyDistribution.morning)" :key="type" class="type-group">
+                    <div class="type-group-header" @click="toggleTypeGroup('morning', type)">
+                      <span class="type-name">{{ type }}</span>
+                      <span class="type-count">({{ typeGroup.length }}次)</span>
+                      <span class="expand-icon">{{ expandedTypeGroups.morning?.[type] ? '▼' : '▶' }}</span>
+                    </div>
+                    <div v-if="expandedTypeGroups.morning?.[type]" class="type-group-content">
+                      <div v-for="(item, index) in typeGroup.slice(0, 3)" :key="index" class="checkin-item">
+                        <span class="checkin-type">{{ item.type }}</span>
+                        <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                      </div>
+                      <div v-if="typeGroup.length > 3" class="more-checkins">
+                        <button class="more-btn" @click="showMoreCheckins('morning', type, typeGroup)">
+                          查看更多 {{ typeGroup.length - 3 }} 条记录
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div v-else class="empty-checkin">暂无打卡</div>
@@ -276,10 +306,24 @@
                 <div class="time-slot-title">上午 (7-12点)</div>
               </div>
               <div class="time-slot-content">
-                <div v-if="historyDistribution.midMorning.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in historyDistribution.midMorning" :key="index" class="checkin-item">
-                    <span class="checkin-type">{{ item.type }}</span>
-                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                <div v-if="historyDistribution.midMorning.length > 0">
+                  <div v-for="(typeGroup, type) in groupByType(historyDistribution.midMorning)" :key="type" class="type-group">
+                    <div class="type-group-header" @click="toggleTypeGroup('midMorning', type)">
+                      <span class="type-name">{{ type }}</span>
+                      <span class="type-count">({{ typeGroup.length }}次)</span>
+                      <span class="expand-icon">{{ expandedTypeGroups.midMorning?.[type] ? '▼' : '▶' }}</span>
+                    </div>
+                    <div v-if="expandedTypeGroups.midMorning?.[type]" class="type-group-content">
+                      <div v-for="(item, index) in typeGroup.slice(0, 3)" :key="index" class="checkin-item">
+                        <span class="checkin-type">{{ item.type }}</span>
+                        <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                      </div>
+                      <div v-if="typeGroup.length > 3" class="more-checkins">
+                        <button class="more-btn" @click="showMoreCheckins('midMorning', type, typeGroup)">
+                          查看更多 {{ typeGroup.length - 3 }} 条记录
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div v-else class="empty-checkin">暂无打卡</div>
@@ -291,10 +335,24 @@
                 <div class="time-slot-title">下午 (13-18点)</div>
               </div>
               <div class="time-slot-content">
-                <div v-if="historyDistribution.afternoon.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in historyDistribution.afternoon" :key="index" class="checkin-item">
-                    <span class="checkin-type">{{ item.type }}</span>
-                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                <div v-if="historyDistribution.afternoon.length > 0">
+                  <div v-for="(typeGroup, type) in groupByType(historyDistribution.afternoon)" :key="type" class="type-group">
+                    <div class="type-group-header" @click="toggleTypeGroup('afternoon', type)">
+                      <span class="type-name">{{ type }}</span>
+                      <span class="type-count">({{ typeGroup.length }}次)</span>
+                      <span class="expand-icon">{{ expandedTypeGroups.afternoon?.[type] ? '▼' : '▶' }}</span>
+                    </div>
+                    <div v-if="expandedTypeGroups.afternoon?.[type]" class="type-group-content">
+                      <div v-for="(item, index) in typeGroup.slice(0, 3)" :key="index" class="checkin-item">
+                        <span class="checkin-type">{{ item.type }}</span>
+                        <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                      </div>
+                      <div v-if="typeGroup.length > 3" class="more-checkins">
+                        <button class="more-btn" @click="showMoreCheckins('afternoon', type, typeGroup)">
+                          查看更多 {{ typeGroup.length - 3 }} 条记录
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div v-else class="empty-checkin">暂无打卡</div>
@@ -306,15 +364,50 @@
                 <div class="time-slot-title">晚上 (19-24点)</div>
               </div>
               <div class="time-slot-content">
-                <div v-if="historyDistribution.evening.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in historyDistribution.evening" :key="index" class="checkin-item">
-                    <span class="checkin-type">{{ item.type }}</span>
-                    <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                <div v-if="historyDistribution.evening.length > 0">
+                  <div v-for="(typeGroup, type) in groupByType(historyDistribution.evening)" :key="type" class="type-group">
+                    <div class="type-group-header" @click="toggleTypeGroup('evening', type)">
+                      <span class="type-name">{{ type }}</span>
+                      <span class="type-count">({{ typeGroup.length }}次)</span>
+                      <span class="expand-icon">{{ expandedTypeGroups.evening?.[type] ? '▼' : '▶' }}</span>
+                    </div>
+                    <div v-if="expandedTypeGroups.evening?.[type]" class="type-group-content">
+                      <div v-for="(item, index) in typeGroup.slice(0, 3)" :key="index" class="checkin-item">
+                        <span class="checkin-type">{{ item.type }}</span>
+                        <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+                      </div>
+                      <div v-if="typeGroup.length > 3" class="more-checkins">
+                        <button class="more-btn" @click="showMoreCheckins('evening', type, typeGroup)">
+                          查看更多 {{ typeGroup.length - 3 }} 条记录
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div v-else class="empty-checkin">暂无打卡</div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 更多打卡记录弹窗 -->
+      <div class="modal" v-if="isMoreCheckinsDialogOpen">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>{{ moreCheckinsTitle }}</h3>
+            <div class="close-icon" @click="closeMoreCheckinsDialog">×</div>
+          </div>
+          <div class="modal-body">
+            <div class="checkin-items">
+              <div v-for="(item, index) in moreCheckinsData" :key="index" class="checkin-item">
+                <span class="checkin-type">{{ item.type }}</span>
+                <span class="checkin-time">{{ item.date }} {{ item.time }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="confirm-btn" @click="closeMoreCheckinsDialog">关闭</button>
           </div>
         </div>
       </div>
@@ -390,12 +483,14 @@ const mealTypes = ['早餐', '午餐', '晚餐', '宵夜']
 const selectedMealType = ref('')
 const customMealType = ref('')
 const isCustomMealDialogOpen = ref(false)
+const showAddMealType = ref(false)
 
 // 运动类型选项
 const exerciseTypes = ['跑步', '健身', '瑜伽', '游泳']
 const selectedExerciseType = ref('')
 const customExerciseType = ref('')
 const isCustomExerciseDialogOpen = ref(false)
+const showAddExerciseType = ref(false)
 
 // 统计数据
 const stats = reactive({
@@ -407,6 +502,19 @@ const stats = reactive({
 
 // 加载状态
 const loading = ref(false)
+
+// 展开的类型分组
+const expandedTypeGroups = reactive({
+  morning: {},
+  midMorning: {},
+  afternoon: {},
+  evening: {}
+})
+
+// 更多打卡记录弹窗
+const isMoreCheckinsDialogOpen = ref(false)
+const moreCheckinsTitle = ref('')
+const moreCheckinsData = ref([])
 
 // 时间分布数据
 const timeDistribution = computed(() => {
@@ -858,6 +966,15 @@ const checkin = async (type) => {
 
       await fetchCheckinStats()
 
+      // 打卡成功后重置添加状态
+      if (type === 'meal') {
+        showAddMealType.value = false
+        selectedMealType.value = ''
+      } else if (type === 'exercise') {
+        showAddExerciseType.value = false
+        selectedExerciseType.value = ''
+      }
+
       uni.showToast({ title: '打卡成功', icon: 'success' })
     } else if (response.code === 403) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
@@ -1023,131 +1140,17 @@ const cancelCheckin = async (type) => {
 /**
  * 重置用餐打卡
  */
-const resetMealCheckin = async () => {
-  if (!userStore.getToken) {
-    uni.showToast({ title: '请先登录', icon: 'none' })
-    setTimeout(() => {
-      uni.navigateTo({ url: '/pages/login/login' })
-    }, 1000)
-    return
-  }
-
-  try {
-    loading.value = true
-
-    const date = getCurrentDate()
-    const response = await del(`/checkin?type=meal&date=${date}`, {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
-    })
-
-    if (response.code === 200) {
-      checkins.meals = []
-      selectedMealType.value = ''
-
-      const date = getCurrentDate()
-      const cacheKey = getTodayCacheKey()
-      const checkinList = []
-      if (checkins.early) {
-        checkinList.push({ type: 'early', checkinTime: new Date().toISOString() })
-      }
-      if (checkins.sleep) {
-        checkinList.push({ type: 'sleep', checkinTime: new Date().toISOString() })
-      }
-      for (const meal of checkins.meals) {
-        checkinList.push({ type: 'meal', checkinTime: new Date().toISOString(), mealType: meal.type })
-      }
-      for (const exercise of checkins.exercises) {
-        checkinList.push({ type: 'exercise', checkinTime: new Date().toISOString(), exerciseType: exercise.type })
-      }
-      setCache(cacheKey, {
-        data: checkinList,
-        date: date
-      })
-
-      await fetchCheckinStats()
-
-      uni.showToast({ title: '已重置，请重新打卡', icon: 'success' })
-    } else if (response.code === 403) {
-      uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
-      setTimeout(() => {
-        uni.navigateTo({ url: '/pages/login/login' })
-      }, 1000)
-    } else {
-      uni.showToast({ title: '重置失败', icon: 'none' })
-    }
-  } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
-  } finally {
-    loading.value = false
-  }
+const resetMealCheckin = () => {
+  // 显示添加新用餐打卡的类型选择器
+  showAddMealType.value = true
+  selectedMealType.value = ''
 }
 
 // 重置运动打卡
-const resetExerciseCheckin = async () => {
-  if (!userStore.getToken) {
-    uni.showToast({ title: '请先登录', icon: 'none' })
-    setTimeout(() => {
-      uni.navigateTo({ url: '/pages/login/login' })
-    }, 1000)
-    return
-  }
-
-  try {
-    loading.value = true
-    
-    const date = getCurrentDate()
-    // 调用 API 删除所有运动打卡记录
-    const response = await uni.request({
-      url: `/api/checkin?type=exercise&date=${date}`,
-      method: 'DELETE',
-      header: {
-        'Authorization': `Bearer ${userStore.getToken}`
-      }
-    })
-    
-    if (response.statusCode === 200 && response.data.code === 200) {
-      // 清空本地状态
-      checkins.exercises = []
-      selectedExerciseType.value = ''
-
-      // 更新缓存
-      const date = getCurrentDate()
-      const cacheKey = getTodayCacheKey()
-      const checkinList = []
-      if (checkins.early) {
-        checkinList.push({ type: 'early', checkinTime: new Date().toISOString() })
-      }
-      if (checkins.sleep) {
-        checkinList.push({ type: 'sleep', checkinTime: new Date().toISOString() })
-      }
-      for (const meal of checkins.meals) {
-        checkinList.push({ type: 'meal', checkinTime: new Date().toISOString(), mealType: meal.type })
-      }
-      for (const exercise of checkins.exercises) {
-        checkinList.push({ type: 'exercise', checkinTime: new Date().toISOString(), exerciseType: exercise.type })
-      }
-      setCache(cacheKey, {
-        data: checkinList,
-        date: date
-      })
-
-      // 重新获取统计数据
-      await fetchCheckinStats()
-
-      uni.showToast({ title: '已重置，请重新打卡', icon: 'success' })
-    } else if (response.statusCode === 403) {
-      uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
-      setTimeout(() => {
-        uni.navigateTo({ url: '/pages/login/login' })
-      }, 1000)
-    } else {
-      uni.showToast({ title: '重置失败', icon: 'none' })
-    }
-  } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
-  } finally {
-    loading.value = false
-  }
+const resetExerciseCheckin = () => {
+  // 显示添加新运动打卡的类型选择器
+  showAddExerciseType.value = true
+  selectedExerciseType.value = ''
 }
 
 // 获取子类型列表
@@ -1361,6 +1364,48 @@ const updateCheckinsFromList = (checkinList) => {
   }
 }
 
+/**
+ * 按类型分组打卡记录
+ */
+const groupByType = (checkins) => {
+  return checkins.reduce((groups, checkin) => {
+    const type = checkin.type
+    if (!groups[type]) {
+      groups[type] = []
+    }
+    groups[type].push(checkin)
+    return groups
+  }, {})
+}
+
+/**
+ * 切换类型分组的展开/收起状态
+ */
+const toggleTypeGroup = (timeSlot, type) => {
+  if (!expandedTypeGroups[timeSlot]) {
+    expandedTypeGroups[timeSlot] = {}
+  }
+  expandedTypeGroups[timeSlot][type] = !expandedTypeGroups[timeSlot][type]
+}
+
+/**
+ * 显示更多打卡记录
+ */
+const showMoreCheckins = (timeSlot, type, checkins) => {
+  moreCheckinsTitle.value = `${type}打卡记录`
+  moreCheckinsData.value = checkins
+  isMoreCheckinsDialogOpen.value = true
+}
+
+/**
+ * 关闭更多打卡记录弹窗
+ */
+const closeMoreCheckinsDialog = () => {
+  isMoreCheckinsDialogOpen.value = false
+  moreCheckinsTitle.value = ''
+  moreCheckinsData.value = []
+}
+
 // 获取统计数据
 const fetchCheckinStats = async () => {
   // 检查是否登录
@@ -1445,7 +1490,8 @@ onMounted(() => {
 }
 
 .checkin-card.checked {
-  background-color: rgba(194, 151, 127, 0.1);
+  background-color: #F2EEE8;
+  border: 1px solid rgba(194, 151, 127, 0.3);
 }
 
 .checkin-header {
@@ -1799,6 +1845,71 @@ onMounted(() => {
   font-size: 14px;
   padding: 12px 0;
   font-style: italic;
+}
+
+/* 类型分组样式 */
+.type-group {
+  margin-bottom: 12px;
+}
+
+.type-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: rgba(194, 151, 127, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.type-group-header:hover {
+  background-color: rgba(194, 151, 127, 0.2);
+}
+
+.type-name {
+  font-weight: 500;
+  color: var(--text-color, #333333);
+}
+
+.type-count {
+  font-size: 12px;
+  color: #666;
+  margin-left: 8px;
+}
+
+.expand-icon {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.3s ease;
+}
+
+.type-group-content {
+  margin-top: 8px;
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(194, 151, 127, 0.3);
+}
+
+.more-checkins {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.more-btn {
+  background-color: #F2EEE8;
+  border: 1px solid #C2977F;
+  color: #C2977F;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.more-btn:hover {
+  background-color: #C2977F;
+  color: white;
 }
 
 /* 模态框样式 */

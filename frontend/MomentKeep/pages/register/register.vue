@@ -173,7 +173,7 @@ const goToLogin = () => {
 const showUserAgreement = () => {
   uni.showModal({
     title: '用户协议',
-    content: '用户协议内容...',
+    content: '用户协议\n\n1. 协议接受\n   您在使用朝暮记服务前，必须阅读并同意本协议。\n\n2. 账户注册\n   您需要提供真实、准确的个人信息，用于账户创建和验证。\n\n3. 用户行为规范\n   您不得使用本服务从事违法违规活动，不得干扰服务正常运行。\n\n4. 服务内容\n   我们提供日常打卡、待办管理、倒计时等功能，服务可能会根据用户需求进行调整。\n\n5. 知识产权\n   本服务的所有内容和功能均受知识产权保护，未经授权不得复制或使用。\n\n6. 免责声明\n   我们不对因网络故障、设备问题等非人为因素导致的服务中断负责。\n\n7. 协议修改\n   我们有权根据业务需要修改本协议，修改后将在平台公告。\n\n8. 终止服务\n   如您违反本协议，我们有权终止为您提供服务。',
     showCancel: false,
     confirmText: '我知道了'
   })
@@ -185,7 +185,7 @@ const showUserAgreement = () => {
 const showPrivacyPolicy = () => {
   uni.showModal({
     title: '隐私政策',
-    content: '隐私政策内容...',
+    content: '隐私政策\n\n1. 隐私保护\n   我们重视您的隐私，承诺保护您的个人信息安全。\n\n2. 信息收集\n   我们会收集您的账户信息、使用数据等，用于提供和优化服务。\n\n3. 信息使用\n   您的信息将用于账户管理、服务提供、安全验证等必要用途。\n\n4. 信息共享\n   我们不会向第三方共享您的个人信息，除非获得您的明确授权。\n\n5. 数据安全\n   我们采取加密、访问控制等措施保护您的数据安全。\n\n6. 隐私设置\n   您可以通过设置管理您的隐私偏好和个人信息。\n\n7. 未成年人保护\n   我们特别保护未成年人的隐私，未满18岁用户需要监护人同意。\n\n8. 隐私政策更新\n   我们可能会更新隐私政策，更新后将在平台公告。',
     showCancel: false,
     confirmText: '我知道了'
   })
@@ -304,6 +304,8 @@ const handleAgreementChange = (e) => {
   display: block;
   margin-left: auto;
   margin-right: auto;
+  text-align: center;
+  line-height: 50px;
 }
 
 .register-btn:disabled {
