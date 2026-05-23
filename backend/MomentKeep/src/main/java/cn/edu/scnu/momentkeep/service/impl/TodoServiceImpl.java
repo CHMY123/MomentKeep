@@ -19,7 +19,11 @@ public class TodoServiceImpl implements TodoService {
     private final TodoMapper todoMapper;
 
     @Override
-    public Todo createTodo(Todo todo) {
+    public Todo createTodo(Todo todo, Long userId) {
+        if (todo.getTitle() == null || todo.getTitle().trim().isEmpty()) {
+            throw new BusinessException("待办标题不能为空");
+        }
+        todo.setUserId(userId);
         todo.setCompleted(false);
         todoMapper.insert(todo);
         return todo;
@@ -52,14 +56,14 @@ public class TodoServiceImpl implements TodoService {
 
     @Override
     public List<Todo> getTodosByDate(Long userId, LocalDate date) {
-        return todoMapper.selectList(new QueryWrapper<Todo>()
-                .eq("user_id", userId)
-                .eq("todo_date", date));
+        // 由于已移除todo_date字段，现在获取该用户的所有待办
+        return getTodosByUserId(userId);
     }
 
     @Override
     public List<Todo> getTodayTodos(Long userId) {
-        return getTodosByDate(userId, LocalDate.now());
+        // 由于已移除todo_date字段，现在获取该用户的所有待办
+        return getTodosByUserId(userId);
     }
 
     @Override
@@ -72,31 +76,5 @@ public class TodoServiceImpl implements TodoService {
             todoMapper.updateById(todo);
         }
         return todo;
-    }
-
-    @Override
-    public List<Todo> copyYesterdayTodos(Long userId) {
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        LocalDate today = LocalDate.now();
-        
-        // 获取昨天未完成的待办
-        List<Todo> yesterdayTodos = todoMapper.selectList(new QueryWrapper<Todo>()
-                .eq("user_id", userId)
-                .eq("todo_date", yesterday)
-                .eq("completed", false));
-        
-        // 复制到今天
-        for (Todo todo : yesterdayTodos) {
-            Todo newTodo = new Todo();
-            newTodo.setUserId(todo.getUserId());
-            newTodo.setTitle(todo.getTitle());
-            newTodo.setDescription(todo.getDescription());
-            newTodo.setTodoDate(today);
-            newTodo.setCompleted(false);
-            newTodo.setCreateTime(LocalDateTime.now());
-            todoMapper.insert(newTodo);
-        }
-        
-        return getTodayTodos(userId);
     }
 }

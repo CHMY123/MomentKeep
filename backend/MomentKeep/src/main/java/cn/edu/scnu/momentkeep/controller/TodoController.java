@@ -22,7 +22,9 @@ public class TodoController {
     @PostMapping
     @Operation(summary = "创建待办")
     public Result<Todo> createTodo(@RequestBody Todo todo) {
-        Todo createdTodo = todoService.createTodo(todo);
+        // 从当前登录用户获取userId
+        Long userId = 1L; // 这里需要从SecurityContext中获取，暂时硬编码
+        Todo createdTodo = todoService.createTodo(todo, userId);
         return Result.success(createdTodo);
     }
 
@@ -81,12 +83,4 @@ public class TodoController {
         return Result.success(completedTodo);
     }
 
-    @PostMapping("/copy-yesterday")
-    @Operation(summary = "复制昨天的待办到今天")
-    public Result<List<Todo>> copyYesterdayTodos() {
-        // 从当前登录用户获取userId
-        Long userId = 1L; // 这里需要从SecurityContext中获取，暂时硬编码
-        List<Todo> todos = todoService.copyYesterdayTodos(userId);
-        return Result.success(todos);
     }
-}

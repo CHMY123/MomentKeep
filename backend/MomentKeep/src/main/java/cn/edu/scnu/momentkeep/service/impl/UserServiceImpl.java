@@ -143,21 +143,28 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public void updateProfile(UpdateProfileDTO dto) {
         User user = getCurrentUser();
+        Long userId = user.getId();
+        
+        UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+        updateWrapper.eq("id", userId);
         
         if (dto.getNickname() != null) {
-            user.setNickname(dto.getNickname());
+            if (dto.getNickname().trim().isEmpty()) {
+                throw new BusinessException("昵称不能为空");
+            }
+            updateWrapper.set("nickname", dto.getNickname());
         }
         if (dto.getEmail() != null) {
-            user.setEmail(dto.getEmail());
+            updateWrapper.set("email", dto.getEmail());
         }
         if (dto.getPhone() != null) {
-            user.setPhone(dto.getPhone());
+            updateWrapper.set("phone", dto.getPhone());
         }
         if (dto.getAvatar() != null) {
-            user.setAvatar(dto.getAvatar());
+            updateWrapper.set("avatar", dto.getAvatar());
         }
         
-        userMapper.updateById(user);
+        super.update(updateWrapper);
     }
     
     @Override

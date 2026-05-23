@@ -23,7 +23,7 @@
           <div class="todo-content">
             <div class="todo-icon" :class="{ 'completed': todo.completed }" @click="toggleTodo(todo.id)"></div>
             <div class="todo-text">
-              <span :class="{ 'completed-text': todo.completed }">{{ todo.title }}</span>
+              <span :class="['todo-title-link', { 'completed-text': todo.completed }]" @click="showFocusStats(todo)">{{ todo.title }}</span>
               <span v-if="todo.description" class="todo-description">{{ todo.description }}</span>
             </div>
           </div>
@@ -71,6 +71,43 @@
           </div>
         </div>
       </div>
+
+      <!-- 专注记录统计弹窗 -->
+      <div class="modal" v-if="isFocusStatsOpen">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>专注记录统计</h3>
+            <div class="close-icon" @click="closeFocusStats">×</div>
+          </div>
+          <div class="modal-body" v-if="currentTodoFocusStats">
+            <div class="focus-stats-todo-title">{{ currentTodoFocusStats.todoTitle }}</div>
+            <div class="focus-stats-summary">
+              <div class="stat-item">
+                <span class="stat-value">{{ formatDuration(currentTodoFocusStats.totalDuration) }}</span>
+                <span class="stat-label">总专注时长</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ currentTodoFocusStats.recordCount }}</span>
+                <span class="stat-label">专注次数</span>
+              </div>
+            </div>
+            <div v-if="currentTodoFocusStats.records && currentTodoFocusStats.records.length > 0" class="focus-records-list">
+              <div class="records-title">专注记录</div>
+              <div v-for="(record, index) in currentTodoFocusStats.records" :key="index" class="record-item">
+                <span class="record-mode">{{ record.mode === 'stopwatch' ? '计时' : record.mode === 'countdown' ? '倒计时' : '番茄钟' }}</span>
+                <span class="record-duration">{{ formatDuration(record.duration) }}</span>
+                <span class="record-time">{{ record.startTime ? new Date(record.startTime).toLocaleString('zh-CN') : '' }}</span>
+              </div>
+            </div>
+            <div v-else class="empty-focus-records">
+              暂无专注记录
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="confirm-btn" @click="closeFocusStats">关闭</button>
+          </div>
+        </div>
+      </div>
     </div>
   </Layout>
 </template>
@@ -114,6 +151,11 @@ const completionNote = ref('')
 const isEditDialogOpen = ref(false)
 const isCompleteDialogOpen = ref(false)
 const completingTodoId = ref(null)
+
+// 专注记录弹窗
+const isFocusStatsOpen = ref(false)
+const currentTodoFocusStats = ref(null)
+const currentTodoFocusRecords = ref([])
 
 // 加载状态
 const loading = ref(false)
@@ -170,9 +212,7 @@ const addTodo = async () => {
     try {
       const response = await post('/todo', {
         title: newTodo.title,
-        description: newTodo.description,
-        todoDate: new Date().toISOString().split('T')[0],
-        userId: 1
+        description: newTodo.description
       }, {
         'Authorization': `Bearer ${userStore.getToken}`
       })
@@ -188,11 +228,13 @@ const addTodo = async () => {
           uni.navigateTo({ url: '/pages/login/login' })
         }, 1000)
       } else {
-        uni.showToast({ title: '添加失败', icon: 'none' })
+        uni.showToast({ title: response.message || '添加失败', icon: 'none' })
       }
     } catch (error) {
       uni.showToast({ title: '网络错误', icon: 'none' })
     }
+  } else {
+    uni.showToast({ title: '请输入待办标题', icon: 'none' })
   }
 }
 
@@ -422,6 +464,64 @@ const closeCompleteDialog = () => {
   completingTodoId.value = null
 }
 
+/**
+ * 显示待办的专注记录统计
+ */
+const showFocusStats = async (todo) => {
+  if (!userStore.getToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }, 1000)
+    return
+  }
+
+  try {
+    const response = await get(`/focus/record/todo/${todo.id}`, {}, {
+      'Authorization': `Bearer ${userStore.getToken}`
+    })
+
+    if (response.code === 200) {
+      currentTodoFocusStats.value = {
+        todoTitle: todo.title,
+        totalDuration: response.data.totalDuration || 0,
+        recordCount: response.data.recordCount || 0,
+        records: response.data.records || []
+      }
+      isFocusStatsOpen.value = true
+    } else if (response.code === 403) {
+      uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/login/login' })
+      }, 1000)
+    } else {
+      uni.showToast({ title: '获取专注记录失败', icon: 'none' })
+    }
+  } catch (error) {
+    uni.showToast({ title: '网络错误', icon: 'none' })
+  }
+}
+
+/**
+ * 关闭专注记录弹窗
+ */
+const closeFocusStats = () => {
+  isFocusStatsOpen.value = false
+  currentTodoFocusStats.value = null
+}
+
+/**
+ * 格式化时长显示
+ */
+const formatDuration = (seconds) => {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) {
+    return `${hours}小时${minutes}分钟`
+  }
+  return `${minutes}分钟`
+}
+
 // 生命周期
 onMounted(() => {
   // 初始化用户信息
@@ -429,39 +529,6 @@ onMounted(() => {
   
   // 初始化数据
   fetchTodos()
-  
-  // 检查是否是今天第一次进入
-  const today = new Date().toDateString()
-  const lastVisit = uni.getStorageSync('lastVisit')
-  if (lastVisit !== today) {
-    // 弹出提示是否保留昨天的待办
-    uni.showModal({
-      title: '提示',
-      content: '是否保留昨天的待办到今天？',
-      success: async (res) => {
-        if (res.confirm && userStore.getToken) {
-          // 保留昨天的待办
-          try {
-            const response = await post('/todo/copy-yesterday', {}, {
-              'Authorization': `Bearer ${userStore.getToken}`
-            })
-            
-            if (response.code === 200) {
-              uni.showToast({ title: '已保留昨天的待办', icon: 'success' })
-              // 重新加载待办列表
-              await fetchTodos()
-            } else {
-              uni.showToast({ title: '保留待办失败', icon: 'none' })
-            }
-          } catch (error) {
-            console.error('复制昨天待办失败:', error)
-            uni.showToast({ title: '网络错误', icon: 'none' })
-          }
-        }
-      }
-    })
-    uni.setStorageSync('lastVisit', today)
-  }
 })
 </script>
 
@@ -543,7 +610,7 @@ onMounted(() => {
 
 .todo-content {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex: 1;
 }
 
@@ -553,6 +620,7 @@ onMounted(() => {
   color: #666666;
   cursor: pointer;
   transition: color 0.3s ease;
+  line-height: 1;
 }
 
 .todo-icon::before {
@@ -619,11 +687,22 @@ onMounted(() => {
 .todo-description {
   font-size: calc(var(--base-font-size) * 0.75); /* 12px */
   color: #999999;
-  margin-top: 4px;
+  margin-top: 8px;
+  display: block;
+}
+
+.todo-title-link {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.todo-title-link:hover {
+  color: var(--primary-color, #C2977F);
 }
 
 .todo-actions {
   display: flex;
+  align-items: center;
   gap: 12px;
   margin-left: 12px;
 }
@@ -747,6 +826,86 @@ onMounted(() => {
 
 .confirm-btn:hover {
   background-color: #A8846B;
+}
+
+/* 专注记录统计弹窗样式 */
+.focus-stats-todo-title {
+  font-size: calc(var(--base-font-size) * 1.125); /* 18px */
+  font-weight: 600;
+  color: var(--primary-color, #C2977F);
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #E8D5C4;
+}
+
+.focus-stats-summary {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-item .stat-value {
+  display: block;
+  font-size: calc(var(--base-font-size) * 1.5); /* 24px */
+  font-weight: 600;
+  color: var(--text-color, #333333);
+}
+
+.stat-item .stat-label {
+  display: block;
+  font-size: calc(var(--base-font-size) * 0.75); /* 12px */
+  color: #999999;
+  margin-top: 4px;
+}
+
+.focus-records-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.records-title {
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
+  font-weight: 500;
+  color: var(--text-color, #333333);
+  margin-bottom: 12px;
+}
+
+.record-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background-color: #F2EEE8;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.record-mode {
+  font-size: calc(var(--base-font-size) * 0.75); /* 12px */
+  color: var(--primary-color, #C2977F);
+}
+
+.record-duration {
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
+  font-weight: 500;
+  color: var(--text-color, #333333);
+}
+
+.record-time {
+  font-size: calc(var(--base-font-size) * 0.75); /* 12px */
+  color: #999999;
+}
+
+.empty-focus-records {
+  text-align: center;
+  padding: 30px 0;
+  color: #999999;
+  font-size: calc(var(--base-font-size) * 0.875); /* 14px */
 }
 
 /* 响应式设计 */

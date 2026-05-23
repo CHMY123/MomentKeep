@@ -237,7 +237,7 @@ const chooseBackground = () => {
     success: (res) => {
       // 上传图片到服务器
       uni.uploadFile({
-        url: 'http://10.252.41.76:8080/api/user/background',
+        url: 'http://localhost:8080/api/user/background',
         filePath: res.tempFilePaths[0],
         name: 'file',
         header: {

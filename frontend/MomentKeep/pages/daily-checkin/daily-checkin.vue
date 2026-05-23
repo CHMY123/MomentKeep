@@ -1702,6 +1702,15 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
+/* 历史打卡时间分布 */
+.history-distribution-section {
+  background-color: var(--sidebar-bg, #F2EEE8);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-top: 20px;
+}
+
 .section-title {
   font-size: 16px;
   font-weight: 500;
@@ -1788,15 +1797,19 @@ onMounted(() => {
 
 .time-slot {
   border: 1px solid #E8D5C4;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  background-color: #F8F6F2;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .time-slot-header {
   background-color: #F2EEE8;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid #E8D5C4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .time-slot-title {
@@ -1856,11 +1869,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 10px 14px;
   background-color: rgba(194, 151, 127, 0.1);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  border: 1px solid #E8D5C4;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .type-group-header:hover {

@@ -10,31 +10,31 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("todo")
-public class Todo {
+@TableName("focus_record")
+public class FocusRecord {
     @TableId(type = IdType.AUTO)
     private Long id;
-    
+
     private Long userId;
-    
-    private String title;
-    
-    private String description;
-    
-    private Integer priority;
-    
-    private Boolean completed;
-    
-    private LocalDateTime completedTime;
-    
-    private String completionNote;
-    
+
+    private String mode;
+
+    private Integer duration;
+
+    private Long todoId;
+
+    private String todoTitle;
+
+    private LocalDateTime startTime;
+
+    private LocalDateTime endTime;
+
     @TableField(fill = com.baomidou.mybatisplus.annotation.FieldFill.INSERT)
     private LocalDateTime createTime;
-    
+
     @TableField(fill = com.baomidou.mybatisplus.annotation.FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-    
+
     @Version
     private Integer version;
 }

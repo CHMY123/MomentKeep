@@ -45,6 +45,13 @@
 			}
 		},
 		{
+			"path": "pages/focus/focus",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
 			"path": "pages/countdown/countdown",
 			"style": {
 				"navigationStyle": "custom",

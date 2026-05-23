@@ -191,7 +191,7 @@ const uploadAvatar = () => {
 
 const updateProfile = async () => {
   try {
-    const response = await post('/user/update', {
+    const response = await put('/user/profile', {
       nickname: formData.nickname,
       email: formData.email,
       phone: formData.phone

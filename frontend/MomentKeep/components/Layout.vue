@@ -168,6 +168,7 @@ const menuItems = [
   { id: 'home', name: '首页', icon: 'home', path: 'pages/index/index' },
   { id: 'checkin', name: '每日打卡', icon: 'clock', path: 'pages/daily-checkin/daily-checkin' },
   { id: 'todo', name: '今日待办', icon: 'todo-list', path: 'pages/todo/todo' },
+  { id: 'focus', name: '专注计时', icon: 'focus', path: 'pages/focus/focus' },
   { id: 'countdown', name: '未来倒计时', icon: 'time', path: 'pages/countdown/countdown' },
   { id: 'settings', name: '设置', icon: 'settings', path: 'pages/settings/settings' },
   { id: 'about', name: '关于我们', icon: 'info', path: 'pages/about/about' }
@@ -179,6 +180,7 @@ const getIconClass = (iconName) => {
     'home': 'icon-home',
     'clock': 'icon-clock',
     'todo-list': 'icon-todo',
+    'focus': 'icon-focus',
     'time': 'icon-time',
     'settings': 'icon-settings',
     'info': 'icon-info'
@@ -689,6 +691,16 @@ onUnmounted(() => {
   background-repeat: no-repeat;
 }
 
+.icon-focus::before {
+  content: "";
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url(https://img.icons8.com/ios-filled/50/000000/stopwatch.png);
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
 .icon-time::before {
   content: "";
   width: 20px;
@@ -1062,17 +1074,20 @@ onUnmounted(() => {
 }
 
 .ai-input {
-  padding: 16px;
+  padding: 8px 16px;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  min-height: 64px;
+  height: 60px;
   box-sizing: border-box;
   position: sticky;
   bottom: 0;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
+  border-radius: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
 .ai-input input {
