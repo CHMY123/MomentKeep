@@ -41,10 +41,11 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         
+        <!-- Redis依赖已注释，简化部署
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
+        </dependency> -->
         
         <dependency>
             <groupId>org.springframework.boot</groupId>

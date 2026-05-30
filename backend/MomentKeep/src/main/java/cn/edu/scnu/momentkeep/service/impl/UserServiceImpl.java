@@ -36,7 +36,6 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.data.redis.core.RedisTemplate;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -52,7 +51,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final HttpServletRequest request;
-    private final RedisTemplate<String, Object> redisTemplate;
     private final S3Client s3Client;
     private final S3Config s3Config;
     private final UserSettingMapper userSettingMapper;
@@ -92,15 +90,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException("密码错误");
         }
         
-        // 生成token
+        // 生成token（不使用Redis存储，简化部署）
         org.springframework.security.core.userdetails.User springUser = 
             new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), java.util.Collections.emptyList());
         String token = jwtTokenProvider.generateToken(springUser);
-        
-        // 保存token到Redis
-        if (user.getUsername() != null) {
-            redisTemplate.opsForValue().set("token:" + token, java.util.Objects.requireNonNull(user.getUsername()));
-        }
         
         // 构建响应
         LoginResponseVO response = new LoginResponseVO();
@@ -258,10 +251,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     
     @Override
     public void logout() {
-        String token = getTokenFromRequest();
-        if (token != null) {
-            redisTemplate.delete("token:" + token);
-        }
+        // JWT token无状态，服务端无需主动删除（简化部署，不使用Redis）
+        // 客户端应在本地清除token
     }
     
     @Override
@@ -281,11 +272,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setStatus(-1); // -1表示已注销
         userMapper.updateById(user);
         
-        // 3. 清除用户token
-        String token = getTokenFromRequest();
-        if (token != null) {
-            redisTemplate.delete("token:" + token);
-        }
+        // JWT token无状态，服务端无需主动删除（简化部署，不使用Redis）
     }
     
     @Override
@@ -308,11 +295,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
         userMapper.updateById(user);
         
-        // 清除用户token，强制重新登录
-        String token = getTokenFromRequest();
-        if (token != null) {
-            redisTemplate.delete("token:" + token);
-        }
+        // JWT token无状态，服务端无需主动删除（简化部署，不使用Redis）
+        // 用户下次请求时token仍有效，直到过期
     }
     
     @Override
