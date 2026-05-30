@@ -11,7 +11,14 @@
     ></div>
     
     <!-- 侧边栏 -->
-    <div class="sidebar" :class="{ 'sidebar-active': isSidebarOpen, 'sidebar-mobile': isMobile }" :style="{ paddingTop: isMobile ? (20 + safeAreaTop) + 'px' : '20px' }">
+    <div 
+      class="sidebar" 
+      :class="{ 'sidebar-active': isSidebarOpen, 'sidebar-mobile': isMobile }" 
+      :style="{ paddingTop: isMobile ? (20 + safeAreaTop) + 'px' : '20px' }"
+      @touchstart="handleSidebarTouchStart"
+      @touchmove="handleSidebarTouchMove"
+      @touchend="handleSidebarTouchEnd"
+    >
       <div class="user-info">
         <div class="avatar" @click="navigateToProfile" :style="{ backgroundImage: `url(${userAvatar})` }"></div>
         <div class="user-name">{{ userName }}</div>
@@ -66,11 +73,28 @@
       </div>
     </div>
     
+    <!-- 侧边栏遮罩层（小程序和APP端） -->
+    <!-- #ifdef MP-WEIXIN || APP-PLUS -->
+    <div 
+      v-if="isSidebarOpen || isAIChatOpen" 
+      class="sidebar-overlay"
+      @click="handleOverlayClick"
+    ></div>
+    <!-- #endif -->
+    
     <!-- AI聊天侧边栏 -->
-    <div class="ai-sidebar" :class="{ 'ai-sidebar-active': isAIChatOpen }">
+    <div 
+      class="ai-sidebar" 
+      :class="{ 'ai-sidebar-active': isAIChatOpen }"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+    >
       <div class="ai-header" :style="{ height: isMobile ? (48 + safeAreaTop) + 'px' : '48px', paddingTop: isMobile ? safeAreaTop + 'px' : '0' }">
         <span class="ai-title">AI助手</span>
+        <!-- #ifdef H5 -->
         <div class="close-icon" @click="toggleAIChat">×</div>
+        <!-- #endif -->
       </div>
       <div class="ai-content">
         <div class="ai-message ai-message-bot">
@@ -197,6 +221,74 @@ const toggleAIChat = () => {
   isAIChatOpen.value = !isAIChatOpen.value
   if (isAIChatOpen.value && userStore.getToken) {
     loadChatHistory()
+  }
+}
+
+// 滑动关闭相关变量
+const touchStartX = ref(0)
+const touchStartY = ref(0)
+const touchCurrentX = ref(0)
+const touchCurrentY = ref(0)
+const isTouching = ref(false)
+
+// 触摸开始
+const handleTouchStart = (e) => {
+  touchStartX.value = e.touches[0].clientX
+  touchStartY.value = e.touches[0].clientY
+  touchCurrentX.value = touchStartX.value
+  isTouching.value = true
+}
+
+// 触摸移动
+const handleTouchMove = (e) => {
+  if (!isTouching.value) return
+  touchCurrentX.value = e.touches[0].clientX
+}
+
+// 触摸结束
+const handleTouchEnd = () => {
+  if (!isTouching.value) return
+  isTouching.value = false
+  
+  const deltaX = touchCurrentX.value - touchStartX.value
+  
+  // AI侧边栏：右滑关闭（从右向左滑动）
+  if (isAIChatOpen.value && deltaX < -50) {
+    toggleAIChat()
+  }
+}
+
+// 左侧边栏触摸事件处理
+const handleSidebarTouchStart = (e) => {
+  touchStartX.value = e.touches[0].clientX
+  touchStartY.value = e.touches[0].clientY
+  touchCurrentX.value = touchStartX.value
+  isTouching.value = true
+}
+
+const handleSidebarTouchMove = (e) => {
+  if (!isTouching.value) return
+  touchCurrentX.value = e.touches[0].clientX
+}
+
+const handleSidebarTouchEnd = () => {
+  if (!isTouching.value) return
+  isTouching.value = false
+  
+  const deltaX = touchCurrentX.value - touchStartX.value
+  
+  // 左侧边栏：左滑关闭（从左向右滑动）
+  if (isSidebarOpen.value && deltaX > 50) {
+    toggleSidebar()
+  }
+}
+
+// 遮罩层点击处理（关闭侧边栏）
+const handleOverlayClick = () => {
+  if (isAIChatOpen.value) {
+    toggleAIChat()
+  } else if (isSidebarOpen.value) {
+    toggleSidebar()
   }
 }
 

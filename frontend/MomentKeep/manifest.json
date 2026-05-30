@@ -1,7 +1,7 @@
 {
     "name" : "MomentKeep",
-    "appid" : "",
-    "description" : "",
+    "appid" : "__UNI__1F1A9FD",
+    "description" : "朝暮记是一款专注于日常打卡、待办管理和倒计时的个人效率工具，旨在帮助用户养成良好的生活习惯，提高生活质量。通过简洁优雅的界面设计和实用的功能，让用户能够轻松记录每一天的成长和进步。",
     "versionName" : "1.0.0",
     "versionCode" : "100",
     "transformPx" : false,
@@ -68,5 +68,7 @@
     "uniStatistics" : {
         "enable" : false
     },
-    "vueVersion" : "3"
+    "vueVersion" : "3",
+    "locale" : "auto",
+    "fallbackLocale" : "zh-Hans"
 }
