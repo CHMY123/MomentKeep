@@ -1,11 +1,13 @@
-# Render 部署配置文件
-# https://render.com/docs/deploy-to-render
-
 services:
   - type: web
     name: momentkeep-backend
     runtime: docker
+    # 关键修复：指定 Docker 构建的上下文目录（包含 pom.xml 的目录）
+    dockerContextPath: ./backend/MomentKeep
+    # Dockerfile 路径（相对于仓库根目录）
     dockerfilePath: ./backend/MomentKeep/Dockerfile
+    # 可选：指定工作目录
+    rootDir: ./backend/MomentKeep
     region: singapore
     plan: free
     healthCheckPath: /api/user/profile
