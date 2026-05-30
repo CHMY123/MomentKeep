@@ -34,16 +34,25 @@ FROM amazoncorretto:21-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache tzdata && \
+# 安装 curl 用于健康检查（可选）
+RUN apk add --no-cache tzdata curl && \
     cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone && \
     apk del tzdata
 
 COPY --from=builder /build/target/*.jar app.jar
 
+# 创建非 root 用户（可选，提高安全性）
+RUN addgroup -g 1000 -S momentkeep && \
+    adduser -u 1000 -S momentkeep -G momentkeep && \
+    chown -R momentkeep:momentkeep /app
+USER momentkeep
+
 EXPOSE 8080
 
 ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 ENV SPRING_PROFILES_ACTIVE="prod"
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=$SPRING_PROFILES_ACTIVE -Djava.security.egd=file:/dev/./urandom -jar /app/app.jar"]
+# 关键修复：动态绑定端口
+# ${PORT:8080} 表示优先读取环境变量 PORT，如果没有则使用 8080
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=$SPRING_PROFILES_ACTIVE -Djava.security.egd=file:/dev/./urandom -jar /app/app.jar --server.port=${PORT:8080}"]
