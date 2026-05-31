@@ -53,6 +53,20 @@ EXPOSE 8080
 ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 ENV SPRING_PROFILES_ACTIVE="prod"
 
-# 关键修复：动态绑定端口
-# ${PORT:8080} 表示优先读取环境变量 PORT，如果没有则使用 8080
+# 微信云托管环境变量配置（敏感信息通过环境变量传入）
+# 数据库配置
+ENV DB_USERNAME="${DB_USERNAME}"
+ENV DB_PASSWORD="${DB_PASSWORD}"
+
+# JWT配置
+ENV JWT_SECRET_KEY="${JWT_SECRET_KEY}"
+
+# DeepSeek API配置
+ENV DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY}"
+
+# S3存储配置
+ENV S3_ACCESS_KEY="${S3_ACCESS_KEY}"
+ENV S3_SECRET_KEY="${S3_SECRET_KEY}"
+
+# 动态绑定端口
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=$SPRING_PROFILES_ACTIVE -Djava.security.egd=file:/dev/./urandom -jar /app/app.jar --server.port=${PORT:8080}"]
