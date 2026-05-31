@@ -6,7 +6,6 @@
 .mvn/wrapper/maven-wrapper.jar
 
 # 忽略所有配置文件（敏感信息）
-**/application.yml
 **/application-dev.yml
 **/application-prod.yml
 **/bootstrap.yml
