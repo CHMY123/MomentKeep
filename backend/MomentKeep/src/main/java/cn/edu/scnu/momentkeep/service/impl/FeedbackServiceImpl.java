@@ -45,15 +45,20 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Override
     public PageResult<FeedbackVO> getMyFeedback(Integer page, Integer size) {
         User currentUser = userService.getCurrentUser();
-        
+
+        // 收敛分页参数：size <= 0 时 MyBatis-Plus 不会追加 LIMIT（等于全表返回），
+        // 分页插件的 maxLimit 只在 size 过大时生效，挡不住这种反向越界
+        int safePage = (page == null || page < 1) ? 1 : page;
+        int safeSize = (size == null || size < 1) ? 10 : Math.min(size, 100);
+
         // 构建查询条件
         QueryWrapper<Feedback> queryWrapper = new QueryWrapper<Feedback>()
                 .eq("user_id", currentUser.getId())
                 .orderByDesc("create_time");
-        
+
         // 分页查询
         IPage<Feedback> feedbackPage = feedbackMapper.selectPage(
-                new Page<>(page, size),
+                new Page<>(safePage, safeSize),
                 queryWrapper
         );
         

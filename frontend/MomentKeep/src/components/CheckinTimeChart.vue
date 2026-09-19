@@ -1,0 +1,642 @@
+<template>
+  <view class="chart-card">
+    <!-- 图例用 view 绘制（不放进 canvas）：窄屏可自动换行，且不占用绘图区 -->
+    <view v-if="total > 0" class="chart-legend">
+      <view class="legend-item">
+        <view class="legend-dot legend-dot-bar"></view>
+        <text class="legend-text">各时段次数（左轴）</text>
+      </view>
+      <view class="legend-item">
+        <view class="legend-dot legend-dot-line"></view>
+        <text class="legend-text">累计次数（右轴）</text>
+      </view>
+    </view>
+
+    <!-- 容器始终存在，便于测量宽度与绑定 ResizeObserver -->
+    <view class="chart-wrap">
+      <canvas
+        id="checkinTimeChart"
+        canvas-id="checkinTimeChart"
+        class="chart-canvas"
+        :style="{ width: canvasStyleWidth, height: canvasStyleHeight }"
+        @touchstart="onPointerDown"
+        @touchmove="onPointerMove"
+        @touchend="onPointerOut"
+      ></canvas>
+      <view v-if="total === 0" class="chart-empty">
+        <text>暂无打卡数据</text>
+      </view>
+    </view>
+
+    <!--
+      数值提示条：固定在图表下方，而不是跟随手指的气泡。
+      气泡方案在窄屏容易贴边被裁切（正是此前"图表溢出屏幕"的同一类问题），
+      固定提示条既能完整显示，又能同时给出「该时段」和「累计」两个值。
+    -->
+    <view class="chart-tip">
+      <template v-if="activeIndex >= 0">
+        <text class="tip-range">{{ bucketLabels[activeIndex] }}</text>
+        <text class="tip-value">该时段 {{ counts[activeIndex] }} 次</text>
+        <text class="tip-value">累计 {{ cumulatives[activeIndex] }} 次</text>
+      </template>
+      <text v-else class="tip-hint">
+        {{ total > 0 ? '点击柱状图或折线节点，可查看该时段的具体次数' : '暂无打卡数据' }}
+      </text>
+    </view>
+  </view>
+</template>
+
+<script setup>
+/**
+ * 历史打卡时间分布图表（柱状 + 折线 双 Y 轴组合图）
+ *
+ * 设计要点：
+ * 1. 尺寸：进入页面后测量容器真实 px 宽度，canvas 宽度与之严格相等 → 结构上不可能溢出屏幕；
+ * 2. 双轴：左轴 = 单时段次数（柱），右轴 = 累计次数（折线，平滑曲线），两轴各自用 niceMax 取动态量程；
+ * 3. 窄屏：按"每个标签所需宽度"动态抽稀横轴标签（置空而非缩放），避免文字重叠；
+ * 4. 交互：点击/长按/悬停时通过 chart.getCurrentDataIndex 定位数据点，在下方固定提示条展示数值；
+ * 5. 重绘：uCharts 会就地修改配置对象，因此每次重绘都重建 opts；容器尺寸变化时防抖重绘。
+ */
+import { ref, computed, onMounted, onUnmounted, nextTick, getCurrentInstance, watch } from 'vue'
+import uCharts from '@qiun/ucharts'
+
+const props = defineProps({
+  /** 12 个 2 小时时段：[{ label: '00-02', count: 3 }] */
+  buckets: {
+    type: Array,
+    default: () => []
+  }
+})
+
+const instance = getCurrentInstance()
+
+const canvasStyleWidth = ref('100%')
+const canvasStyleHeight = ref('200px')
+/** 当前选中的数据点下标，-1 表示未选中 */
+const activeIndex = ref(-1)
+
+let chart = null
+let resizeTimer = null
+let hideTipTimer = null
+
+const CANVAS_ID = 'checkinTimeChart'
+
+/** 桌面端断点：>=768px 视为桌面 */
+const BREAKPOINT = 768
+
+/** 每个纵轴分几格（左右轴共用，保证网格线对齐） */
+const SPLIT_NUMBER = 4
+
+const total = computed(() =>
+  props.buckets.reduce((sum, item) => sum + (Number(item.count) || 0), 0)
+)
+
+/** 完整时段标签（横轴可能因抽稀而留空，提示条里始终用完整标签） */
+const bucketLabels = computed(() => props.buckets.map(item => item.label || ''))
+
+/** 柱状：各时段次数 */
+const counts = computed(() => props.buckets.map(item => Number(item.count) || 0))
+
+/** 折线：累计次数（单调递增，与柱状量级差异明显 → 双轴才有意义） */
+const cumulatives = computed(() => {
+  let sum = 0
+  return counts.value.map(count => (sum += count))
+})
+
+/** 取"好看"的每格步长：1 / 2 / 2.5 / 5 / 10 的 10^n 倍 */
+const niceStep = raw => {
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)))
+  for (const multiple of [1, 2, 2.5, 5, 10]) {
+    const candidate = multiple * magnitude
+    if (candidate >= raw) return candidate
+  }
+  return 10 * magnitude
+}
+
+/**
+ * 计算纵轴上限。
+ *
+ * 关键：先定"每格步长"再乘格数，保证刻度恒为整数。
+ * 若反过来先定上限（如 5）再除以 4 格，会得到 1.25 / 2.5 / 3.75 这种小数刻度，
+ * 对"次数"这类离散数据是错误表达。
+ *
+ * @param rawMax  数据的实际最大值
+ * @param minTop  最小上限（避免只有 1 次打卡时柱子顶满全屏）
+ */
+const niceMax = (rawMax, minTop = SPLIT_NUMBER) => {
+  if (!rawMax || rawMax <= 0) return minTop
+  const step = niceStep(rawMax / SPLIT_NUMBER)
+  return Math.max(Math.ceil(step) * SPLIT_NUMBER, minTop)
+}
+
+const leftAxisMax = computed(() => niceMax(Math.max(...counts.value, 0)))
+const rightAxisMax = computed(() => niceMax(Math.max(...cumulatives.value, 0)))
+
+/** 当前窗口宽度（用于桌面/移动分支与标签抽稀） */
+const getWindowWidth = () => {
+  try {
+    const info = uni.getSystemInfoSync()
+    return info.windowWidth || 375
+  } catch (e) {
+    return 375
+  }
+}
+
+/**
+ * 按可用宽度动态抽稀横轴标签。
+ * uCharts 的 xAxis.labelCount 是"滚动窗口长度"，不是标签抽稀，
+ * 因此这里直接把不需要显示的标签置为空字符串，效果确定且不会重叠。
+ */
+const buildCategories = (width, narrow) => {
+  const labels = bucketLabels.value
+  const perLabelWidth = narrow ? 30 : 34
+  const step = Math.max(1, Math.ceil((labels.length * perLabelWidth) / Math.max(width, 1)))
+  return labels.map((label, index) => (index % step === 0 ? label : ''))
+}
+
+/** 测量图表容器真实宽度（px） */
+const measureWidth = () =>
+  new Promise(resolve => {
+    uni
+      .createSelectorQuery()
+      .in(instance.proxy)
+      .select('.chart-wrap')
+      .boundingClientRect(rect => resolve(rect && rect.width ? Math.floor(rect.width) : 0))
+      .exec()
+  })
+
+/** 构建 uCharts 配置（每次重绘都重建，避免库内部改写配置带来的脏状态） */
+const buildOptions = (width, height, narrow) => ({
+  type: 'mix',
+  context: null, // 由调用处注入
+  width,
+  height,
+  pixelRatio: 1, // 非 2d 模式固定为 1
+  background: 'transparent',
+  animation: true,
+  rotate: false,
+  categories: buildCategories(width, narrow),
+  series: [
+    {
+      name: '各时段次数',
+      type: 'column',
+      data: counts.value,
+      color: '#C2977F'
+    },
+    {
+      name: '累计次数',
+      type: 'line',
+      data: cumulatives.value,
+      color: '#94A7C8',
+      yAxisIndex: 1, // 挂到右轴
+      width: 2,
+      // 【关键】mix 组合图的曲线开关在这里，不在 extra.line.type。
+      // uCharts 源码中两条绘制路径取值方式不同：
+      //   drawLineDataPoints（type:'line'）  -> 读 lineOption.type（即 extra.line.type）
+      //   drawMixDataPoints（type:'mix'）    -> 只读 eachSeries.style
+      // 因此组合图必须把 style 写在折线 series 自身，否则画出来始终是折线。
+      style: 'curve'
+    }
+  ],
+  xAxis: {
+    disableGrid: true,
+    fontSize: 10,
+    fontColor: '#999999',
+    axisLineColor: '#E8E4DE',
+    itemCount: props.buckets.length,
+    labelCount: props.buckets.length,
+    scrollShow: false,
+    rotateLabel: false
+  },
+  // 注意：双 Y 轴必须是 { data: [...] } 结构，写成数组会静默失效
+  yAxis: {
+    disabled: false,
+    splitNumber: SPLIT_NUMBER,
+    gridType: 'dash',
+    dashLength: 4,
+    gridColor: '#EFEBE6',
+    fontSize: 10,
+    // 轴标题默认不绘制（uCharts 仅在 showTitle 为 true 时画）。
+    // 竖排轴标题在窄屏会挤占绘图区宽度，语义改由图例（左轴/右轴）+ 刻度染色表达。
+    showTitle: false,
+    data: [
+      {
+        min: 0,
+        max: leftAxisMax.value,
+        fontColor: '#C2977F',
+        axisLineColor: '#E3D3C7',
+        // 兜底：即使量程异常，刻度也只显示整数（次数不接受小数）
+        format: value => String(Math.round(value))
+      },
+      {
+        min: 0,
+        max: rightAxisMax.value,
+        fontColor: '#94A7C8',
+        axisLineColor: '#C7D2E2',
+        format: value => String(Math.round(value))
+      }
+    ]
+  },
+  // 图例交给 view 渲染，canvas 内不再画图例
+  legend: { show: false },
+  dataLabel: false,
+  dataPointShape: true,
+  padding: [12, 4, 0, 4],
+  fontSize: 10,
+  extra: {
+    // 兜底：若日后把图表类型换成纯 line/area，这两个键才会生效；
+    // 当前 mix 类型的曲线由上面 series[1].style === 'curve' 决定。
+    line: { type: 'curve' },
+    mix: {
+      column: { seriesGap: 2 },
+      line: { type: 'curve' }
+    },
+    tooltip: {
+      showBox: true,
+      showArrow: false,
+      fontSize: 10,
+      bgColor: '#000000',
+      bgOpacity: 0.7,
+      fontColor: '#FFFFFF'
+    }
+  }
+})
+
+const renderChart = async () => {
+  // 等待 DOM/布局稳定后再测量，避免拿到 0 或旧宽度
+  await nextTick()
+
+  const width = await measureWidth()
+  if (!width) return
+
+  const narrow = getWindowWidth() < BREAKPOINT
+  const height = narrow ? 200 : 300
+
+  canvasStyleWidth.value = width + 'px'
+  canvasStyleHeight.value = height + 'px'
+
+  activeIndex.value = -1
+
+  // 先无条件清空画布。
+  // uCharts 的 background 设为 transparent，它不会自行擦除上一帧，
+  // 若不清空，从「全部」切到无数据的「近30天」时会残留上一次画出的图形。
+  const context = uni.createCanvasContext(CANVAS_ID, instance.proxy)
+  context.clearRect(0, 0, width, height)
+
+  if (total.value === 0) {
+    chart = null
+    // 非 2d 画布需要显式 flush，清空才会真正生效
+    context.draw()
+    return
+  }
+
+  const options = buildOptions(width, height, narrow)
+  options.context = context
+
+  // 每次都新建实例：uCharts 会复用并改写传入的 opts，复用实例在重绘时容易出现脏状态
+  chart = new uCharts(options)
+
+  // 图表就绪后确保事件已绑定（此时容器必然已存在）
+  bindPointer()
+}
+
+const scheduleRender = () => {
+  if (resizeTimer) clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null
+    renderChart()
+  }, 160)
+}
+
+/* ------------------------------ 数值提示交互 ------------------------------ */
+
+/** 无操作后自动隐藏提示条的时间 */
+const TIP_AUTO_HIDE_MS = 4000
+
+/** 事件绑定目标（图表容器，而非内层 canvas） */
+let pointerEl = null
+/** 是否已绑定，避免重复注册监听 */
+let pointerBound = false
+
+/**
+ * 解析指针事件绑定目标。
+ *
+ * @description 绑在 .chart-wrap（uni-view，稳定存在）而不是内层 canvas：
+ * uni-h5 的内层 canvas 在尺寸变化时可能被重建，而 canvas 上的鼠标事件会冒泡到容器，
+ * 因此绑容器既能收到事件，又不会因为节点重建而丢失监听。
+ */
+const resolvePointerEl = () => {
+  if (pointerEl) return pointerEl
+  // #ifdef H5
+  if (typeof document !== 'undefined') {
+    pointerEl = document.querySelector('.chart-wrap')
+  }
+  // #endif
+  return pointerEl
+}
+
+const scheduleHideTip = () => {
+  if (hideTipTimer) clearTimeout(hideTipTimer)
+  hideTipTimer = setTimeout(() => {
+    activeIndex.value = -1
+    hideTipTimer = null
+  }, TIP_AUTO_HIDE_MS)
+}
+
+/**
+ * 构造 uCharts 需要的事件对象（关键：必须给出"相对画布"的 x/y）
+ *
+ * 【为什么不能直接把鼠标事件丢给 uCharts】
+ * uCharts 内部的 getTouches 有两个分支：
+ *   1) 事件上带 clientX 时：x = clientX * pix（没有减去画布左偏移），
+ *      y = (pageY - currentTarget.offsetTop) * pix —— offsetTop 取决于 offsetParent，
+ *      在 uni-h5 里常常算出一个超出画布高度的 y；
+ *   2) 只有 x/y 时：直接按"相对画布坐标"使用。
+ * 而 findCurrentIndex 的第一步是 isInExactChartArea(currentPoints, opts, config)，
+ * 它要求 x 与 y **同时**落在绘图区内，不满足就直接返回 index = -1
+ * （外部表现就是"悬停、长按都没有任何反应"）。
+ * 所以这里统一构造第 2 种形态，用 DOM 矩形自己换算，绕开 offsetTop 这个坑。
+ */
+const buildChartEvent = (clientX, clientY) => {
+  const el = resolvePointerEl()
+  if (!el || typeof el.getBoundingClientRect !== 'function') return null
+  const rect = el.getBoundingClientRect()
+  return {
+    changedTouches: [{ x: clientX - rect.left, y: clientY - rect.top }],
+    currentTarget: el
+  }
+}
+
+/**
+ * 把各来源的指针事件归一化成 uCharts 可识别的事件
+ * @param {Object} event uni 触摸事件或原生鼠标事件
+ * @returns {Object|null} 归一化事件，无法解析时返回 null
+ */
+const normalizePointerEvent = event => {
+  if (!event) return null
+  const touch = (event.changedTouches && event.changedTouches[0])
+    || (event.touches && event.touches[0])
+    || event
+
+  // #ifdef H5
+  // H5 一律按 DOM 矩形换算：坐标必然相对画布，鼠标与触摸两种来源都能覆盖
+  const clientX = typeof touch.clientX === 'number' ? touch.clientX : touch.pageX
+  const clientY = typeof touch.clientY === 'number' ? touch.clientY : touch.pageY
+  if (typeof clientX !== 'number' || typeof clientY !== 'number') return null
+  return buildChartEvent(clientX, clientY)
+  // #endif
+
+  // #ifndef H5
+  // 小程序 / App：uni 的 canvas 事件本身已给出相对画布的 x/y，直接使用
+  if (typeof touch.x === 'number' && typeof touch.y === 'number') {
+    return { changedTouches: [touch], currentTarget: event.currentTarget || resolvePointerEl() }
+  }
+  return null
+  // #endif
+}
+
+/**
+ * 定位指针所在的数据点下标
+ * @param {Object} event 指针事件
+ * @returns {number} 数据下标，未命中返回 -1
+ */
+const locateIndex = event => {
+  if (!chart) return -1
+  const normalized = normalizePointerEvent(event)
+  if (!normalized) return -1
+  try {
+    const result = chart.getCurrentDataIndex(normalized)
+    const index = result && typeof result.index === 'number' ? result.index : -1
+    return index >= 0 && index < props.buckets.length ? index : -1
+  } catch (e) {
+    return -1
+  }
+}
+
+/** 按下 / 点击：定位最近的数据点并展示数值 */
+const onPointerDown = event => {
+  const index = locateIndex(event)
+  if (index < 0) return
+  activeIndex.value = index
+  scheduleHideTip()
+}
+
+/** 移动（鼠标悬停或手指滑动）：实时跟随数据点 */
+const onPointerMove = event => {
+  const index = locateIndex(event)
+  if (index >= 0) {
+    activeIndex.value = index
+    scheduleHideTip()
+  }
+}
+
+/** 离开图表：延迟隐藏，避免数值瞬间消失来不及看 */
+const onPointerOut = () => {
+  scheduleHideTip()
+}
+
+/* --------------------------- 事件绑定与尺寸重绘 --------------------------- */
+
+let resizeObserver = null
+let windowResizeBound = false
+/** 非 H5 端的窗口尺寸监听回调，卸载时必须注销（uni.offWindowResize 要求同一函数引用） */
+let windowResizeHandler = null
+
+/**
+ * 绑定指针事件（仅 H5 需要，移动端由模板上的 touchstart/touchmove 覆盖）
+ * @description 绑在图表容器上：既不会因内层 canvas 重建而丢失，又能收到冒泡上来的鼠标事件
+ */
+const bindPointer = () => {
+  if (pointerBound) return
+  // #ifdef H5
+  const el = resolvePointerEl()
+  if (!el) return
+  el.addEventListener('mousemove', onPointerMove)
+  el.addEventListener('click', onPointerDown)
+  el.addEventListener('mouseleave', onPointerOut)
+  // #endif
+  pointerBound = true
+}
+
+const unbindPointer = () => {
+  // #ifdef H5
+  if (pointerEl) {
+    pointerEl.removeEventListener('mousemove', onPointerMove)
+    pointerEl.removeEventListener('click', onPointerDown)
+    pointerEl.removeEventListener('mouseleave', onPointerOut)
+  }
+  // #endif
+  pointerEl = null
+  pointerBound = false
+}
+
+const bindResize = () => {
+  // #ifdef H5
+  // 容器宽度变化（例如展开/收起左侧边栏）不会触发 window.resize，必须用 ResizeObserver
+  const el = resolvePointerEl()
+  if (el && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => scheduleRender())
+    resizeObserver.observe(el)
+  } else if (typeof window !== 'undefined') {
+    window.addEventListener('resize', scheduleRender)
+    windowResizeBound = true
+  }
+  // #endif
+
+  // #ifndef H5
+  // 保存回调引用：uni.offWindowResize 需要同一个函数实例才能注销，
+  // 否则组件卸载后监听仍留在全局，反复进出页面会不断累积。
+  if (typeof uni.onWindowResize === 'function' && !windowResizeHandler) {
+    windowResizeHandler = () => scheduleRender()
+    uni.onWindowResize(windowResizeHandler)
+  }
+  // #endif
+}
+
+onMounted(async () => {
+  await renderChart()
+  bindResize()
+  bindPointer()
+})
+
+onUnmounted(() => {
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+    resizeTimer = null
+  }
+  if (hideTipTimer) {
+    clearTimeout(hideTipTimer)
+    hideTipTimer = null
+  }
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+  if (windowResizeBound && typeof window !== 'undefined') {
+    window.removeEventListener('resize', scheduleRender)
+    windowResizeBound = false
+  }
+  unbindPointer()
+
+  // #ifndef H5
+  if (windowResizeHandler && typeof uni.offWindowResize === 'function') {
+    uni.offWindowResize(windowResizeHandler)
+  }
+  windowResizeHandler = null
+  // #endif
+
+  chart = null
+})
+
+// 数据到达后（或切换时间范围后）重绘
+watch(
+  () => props.buckets,
+  () => {
+    renderChart()
+  },
+  { deep: true }
+)
+
+/** 供父组件在必要时手动触发重绘 */
+defineExpose({
+  refresh: renderChart
+})
+</script>
+
+<style scoped>
+.chart-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap; /* 窄屏自动换行，不撑宽容器 */
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+.legend-dot-bar {
+  background-color: #c2977f;
+}
+
+.legend-dot-line {
+  height: 2px;
+  border-radius: 1px;
+  background-color: #94a7c8;
+}
+
+.legend-text {
+  font-size: 11px;
+  color: #888888;
+}
+
+/* 关键：宽度只跟随父容器，overflow hidden 兜底，杜绝横向溢出 */
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.chart-canvas {
+  display: block;
+}
+
+.chart-empty {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.4;
+  font-size: 13px;
+  color: #aaaaaa;
+}
+
+/* 数值提示条：固定高度，不会因内容变化撑动布局 */
+.chart-tip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 20px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.tip-range {
+  font-size: 12px;
+  font-weight: 500;
+  color: #c2977f;
+}
+
+.tip-value {
+  font-size: 12px;
+  color: #555555;
+}
+
+.tip-hint {
+  font-size: 12px;
+  color: #999999;
+}
+</style>

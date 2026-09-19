@@ -11,6 +11,7 @@ public enum ResultCode {
     UNAUTHORIZED(401, "未授权"),
     FORBIDDEN(403, "禁止访问"),
     NOT_FOUND(404, "资源不存在"),
+    TOO_MANY_REQUESTS(429, "请求过于频繁"),
     
     // 业务错误
     USER_EXISTS(1001, "用户已存在"),

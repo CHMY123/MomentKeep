@@ -135,7 +135,7 @@ public class UserController {
     @PostMapping("/delete")
     @Operation(summary = "注销账户")
     public Result<Void> deleteAccount(@RequestBody @Valid DeleteAccountDTO dto) {
-        userService.deleteAccount();
+        userService.deleteAccount(dto);
         return Result.success();
     }
 

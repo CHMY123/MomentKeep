@@ -79,4 +79,18 @@ public class Result<T> {
                            null,
                            System.currentTimeMillis());
     }
+
+    /**
+     * 返回错误结果（自定义错误码 + 错误消息）
+     * @param <T> 泛型类型
+     * @param code 错误码
+     * @param message 错误消息
+     * @return Result实例
+     */
+    public static <T> Result<T> error(Integer code, String message) {
+        return new Result<>(code,
+                           message,
+                           null,
+                           System.currentTimeMillis());
+    }
 }

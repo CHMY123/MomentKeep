@@ -1,23 +1,31 @@
 package cn.edu.scnu.momentkeep.service.impl;
 
+import cn.edu.scnu.momentkeep.common.PageResult;
 import cn.edu.scnu.momentkeep.entity.Checkin;
 import cn.edu.scnu.momentkeep.mapper.CheckinMapper;
 import cn.edu.scnu.momentkeep.service.CheckinService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class CheckinServiceImpl implements CheckinService {
-    
+
+    /** 时间分布分桶数：每 2 小时一个桶，共 12 个 */
+    private static final int TIME_BUCKET_COUNT = 12;
+
     @Autowired
     private CheckinMapper checkinMapper;
     
@@ -200,13 +208,124 @@ public class CheckinServiceImpl implements CheckinService {
         return result;
     }
     
+    /**
+     * 历史打卡记录
+     *
+     * <p>原先使用 {@code .last("LIMIT " + limit)} 拼接 SQL，存在注入隐患；
+     * 改为分页插件查询（limit 已由控制器收敛到 1~200）。</p>
+     */
     @Override
     public List<Checkin> getHistoryCheckins(Long userId, int limit) {
         LambdaQueryWrapper<Checkin> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Checkin::getUserId, userId)
-                .orderByDesc(Checkin::getCheckinTime)
-                .last("LIMIT " + limit);
-        
-        return checkinMapper.selectList(queryWrapper);
+                .orderByDesc(Checkin::getCheckinTime);
+
+        Page<Checkin> page = new Page<>(1, limit);
+        return checkinMapper.selectPage(page, queryWrapper).getRecords();
+    }
+
+    /**
+     * 打卡时间分布汇总（全量历史，或指定日期区间）
+     *
+     * <p>此前前端只能取最近 30 条记录在客户端聚合，「历史分布」名不副实。
+     * 这里把聚合下推到数据库（{@code GROUP BY HOUR(checkin_time)}），
+     * 只回传 12 个时段分桶 + 分类计数，避免把全部明细拉进内存。</p>
+     *
+     * @param userId    当前用户
+     * @param startDate 起始日期（含），可为 null 表示不限
+     * @param endDate   结束日期（含），可为 null 表示不限
+     * @return total / buckets / typeCounts
+     */
+    @Override
+    public Map<String, Object> getTimeDistributionSummary(Long userId, LocalDate startDate, LocalDate endDate) {
+        QueryWrapper<Checkin> wrapper = new QueryWrapper<>();
+        wrapper.select("HOUR(checkin_time) AS hour_of_day", "type AS type", "COUNT(*) AS cnt")
+                .eq("user_id", userId)
+                .groupBy("HOUR(checkin_time)", "type");
+        if (startDate != null) {
+            wrapper.ge("checkin_time", startDate.atStartOfDay());
+        }
+        if (endDate != null) {
+            wrapper.lt("checkin_time", endDate.plusDays(1).atStartOfDay());
+        }
+
+        List<Map<String, Object>> rows = checkinMapper.selectMaps(wrapper);
+
+        int[] bucketCounts = new int[TIME_BUCKET_COUNT];
+        Map<String, Integer> typeCounts = new LinkedHashMap<>();
+        int total = 0;
+
+        for (Map<String, Object> row : rows) {
+            int hour = toInt(row.get("hour_of_day"));
+            int count = toInt(row.get("cnt"));
+            Object type = row.get("type");
+
+            int index = Math.min(Math.max(hour, 0) / 2, TIME_BUCKET_COUNT - 1);
+            bucketCounts[index] += count;
+            typeCounts.merge(type == null ? "unknown" : type.toString(), count, Integer::sum);
+            total += count;
+        }
+
+        List<Map<String, Object>> buckets = new ArrayList<>(TIME_BUCKET_COUNT);
+        for (int i = 0; i < TIME_BUCKET_COUNT; i++) {
+            Map<String, Object> bucket = new LinkedHashMap<>(2);
+            bucket.put("label", String.format("%02d-%02d", i * 2, i * 2 + 2));
+            bucket.put("count", bucketCounts[i]);
+            buckets.add(bucket);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>(3);
+        result.put("total", total);
+        result.put("buckets", buckets);
+        result.put("typeCounts", typeCounts);
+        return result;
+    }
+
+    /**
+     * 分页查询历史打卡记录（支持日期区间与类型筛选）
+     */
+    @Override
+    public PageResult<Checkin> getHistoryPage(Long userId, int page, int size,
+                                              LocalDate startDate, LocalDate endDate,
+                                              String type, String subType) {
+        LambdaQueryWrapper<Checkin> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Checkin::getUserId, userId);
+
+        if (startDate != null) {
+            wrapper.ge(Checkin::getCheckinTime, startDate.atStartOfDay());
+        }
+        if (endDate != null) {
+            wrapper.lt(Checkin::getCheckinTime, endDate.plusDays(1).atStartOfDay());
+        }
+        // type 为空或 all 时表示不限类型
+        if (StringUtils.hasText(type) && !"all".equalsIgnoreCase(type)) {
+            wrapper.eq(Checkin::getType, type);
+        }
+        // 子类型：用餐对应 mealType，运动对应 exerciseType，其余类型不受影响
+        if (StringUtils.hasText(subType) && !"all".equalsIgnoreCase(subType)) {
+            wrapper.and(w -> w.eq(Checkin::getMealType, subType)
+                    .or()
+                    .eq(Checkin::getExerciseType, subType));
+        }
+        wrapper.orderByDesc(Checkin::getCheckinTime);
+
+        Page<Checkin> result = checkinMapper.selectPage(new Page<>(page, size), wrapper);
+        return PageResult.of(result.getRecords(), result.getTotal(),
+                (int) result.getCurrent(), (int) result.getSize());
+    }
+
+    /** 数据库返回值可能是 Long/Integer/BigDecimal，统一转 int */
+    private static int toInt(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

@@ -12,7 +12,9 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -42,7 +44,9 @@ public class User {
     /** 头像URL */
     private String avatar;
 
-    /** 密码（加密存储） */
+    /** 密码（加密存储）；禁止序列化返回前端、禁止进入日志 */
+    @JsonIgnore
+    @ToString.Exclude
     private String password;
 
     /** 创建时间 - 插入时自动填充 */
@@ -62,4 +66,12 @@ public class User {
     /** 乐观锁版本号 */
     @Version
     private Integer version;
+
+    /**
+     * 令牌版本号
+     *
+     * <p>登出、改密、注销时自增，使已签发的 JWT 立即失效（JWT 本身无状态，
+     * 用版本号做吊销，避免为了黑名单再引入 Redis）。</p>
+     */
+    private Integer tokenVersion;
 }

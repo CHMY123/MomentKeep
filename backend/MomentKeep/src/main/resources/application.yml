@@ -1,6 +1,13 @@
 spring:
   application:
     name: MomentKeep
+  # 默认激活 local：本机开发读取 <工作目录>/config/application-local.yml（该文件不在 src 下，
+  # 不会被打进 jar，且已被 .gitignore 忽略）。
+  # 生产环境启动时通过命令行/系统属性覆盖为 prod：
+  #   java -jar app.jar --spring.profiles.active=prod
+  # 命令行参数优先级最高，因此这里的默认值不会影响线上。
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   main:
     allow-circular-references: true
   datasource:
@@ -8,11 +15,15 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    show-sql: true
-    database-platform: org.hibernate.dialect.TiDBDialect
-    hibernate:
-      ddl-auto: create-drop
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 5000
+      # 三个时间参数必须满足 idleTimeout/keepaliveTime < maxLifetime，
+      # 否则 HikariCP 会在启动时打印警告并自动禁用它们
+      idle-timeout: 300000
+      max-lifetime: 600000
+      keepalive-time: 120000
   sql:
     init:
       mode: never
@@ -22,7 +33,7 @@ spring:
       max-request-size: 10MB
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 mybatis-plus:
   mapper-locations: classpath:mapper/**/*.xml
@@ -33,20 +44,47 @@ mybatis-plus:
 deepseek:
   api:
     key: ${DEEPSEEK_API_KEY}
-    url: https://api.deepseek.com
+    url: ${DEEPSEEK_API_URL:https://api.deepseek.com}
 
 jwt:
   secret:
     key: ${JWT_SECRET_KEY}
   expiration:
-    time: 86400000
+    time: ${JWT_EXPIRATION_TIME:86400000}
+  issuer: ${JWT_ISSUER:momentkeep}
 
+# 键名使用 kebab-case，与 S3Config 中的 @Value 占位符保持一致
 s3:
-  accessKey: ${S3_ACCESS_KEY}
-  secretKey: ${S3_SECRET_KEY}
-  bucketName: momentkeep
-  endpoint: https://s3.bitiful.net
-  region: cn-east-1
+  access-key: ${S3_ACCESS_KEY}
+  secret-key: ${S3_SECRET_KEY}
+  bucket-name: ${S3_BUCKET_NAME:momentkeep}
+  endpoint: ${S3_ENDPOINT:https://s3.bitiful.net}
+  # 默认值必须与历史上硬编码的值一致：SigV4 签名包含区域，改错会导致上传失败
+  region: ${S3_REGION:cn-north-1}
+
+app:
+  cors:
+    # 逗号分隔的跨域白名单；生产环境务必改成正式域名
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+ai:
+  quota:
+    # 单用户每日 AI 对话次数上限（严格限额）
+    daily-limit: ${AI_DAILY_LIMIT:3}
+    # 全局每日调用总上限，防止被批量注册的账号刷爆 API 额度
+    global-daily-limit: ${AI_GLOBAL_DAILY_LIMIT:200}
+  http:
+    connect-timeout-ms: 10000
+    read-timeout-ms: 60000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
 
 logging:
   level:

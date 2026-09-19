@@ -3,9 +3,12 @@ package cn.edu.scnu.momentkeep.controller;
 import cn.edu.scnu.momentkeep.common.Result;
 import cn.edu.scnu.momentkeep.entity.Todo;
 import cn.edu.scnu.momentkeep.service.TodoService;
+import cn.edu.scnu.momentkeep.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -18,69 +21,55 @@ import java.util.List;
 public class TodoController {
 
     private final TodoService todoService;
+    private final UserService userService;
 
     @PostMapping
     @Operation(summary = "创建待办")
-    public Result<Todo> createTodo(@RequestBody Todo todo) {
-        // 从当前登录用户获取userId
-        Long userId = 1L; // 这里需要从SecurityContext中获取，暂时硬编码
-        Todo createdTodo = todoService.createTodo(todo, userId);
-        return Result.success(createdTodo);
+    public Result<Todo> createTodo(@RequestBody @Valid Todo todo) {
+        return Result.success(todoService.createTodo(todo, userService.getCurrentUserId()));
     }
 
     @PutMapping
     @Operation(summary = "更新待办")
-    public Result<Todo> updateTodo(@RequestBody Todo todo) {
-        Todo updatedTodo = todoService.updateTodo(todo);
-        return Result.success(updatedTodo);
+    public Result<Todo> updateTodo(@RequestBody @Valid Todo todo) {
+        return Result.success(todoService.updateTodo(todo, userService.getCurrentUserId()));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除待办")
     public Result<Void> deleteTodo(@PathVariable Long id) {
-        todoService.deleteTodo(id);
+        todoService.deleteTodo(id, userService.getCurrentUserId());
         return Result.success();
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "获取待办详情")
     public Result<Todo> getTodoById(@PathVariable Long id) {
-        Todo todo = todoService.getTodoById(id);
-        return Result.success(todo);
+        return Result.success(todoService.getTodoById(id, userService.getCurrentUserId()));
     }
 
     @GetMapping
     @Operation(summary = "获取用户所有待办")
     public Result<List<Todo>> getTodosByUserId() {
-        // 从当前登录用户获取userId
-        Long userId = 1L; // 这里需要从SecurityContext中获取，暂时硬编码
-        List<Todo> todos = todoService.getTodosByUserId(userId);
-        return Result.success(todos);
+        return Result.success(todoService.getTodosByUserId(userService.getCurrentUserId()));
     }
 
     @GetMapping("/date/{date}")
-    @Operation(summary = "按日期获取待办")
-    public Result<List<Todo>> getTodosByDate(@PathVariable LocalDate date) {
-        // 从当前登录用户获取userId
-        Long userId = 1L; // 这里需要从SecurityContext中获取，暂时硬编码
-        List<Todo> todos = todoService.getTodosByDate(userId, date);
-        return Result.success(todos);
+    @Operation(summary = "按创建日期获取待办")
+    public Result<List<Todo>> getTodosByDate(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return Result.success(todoService.getTodosByDate(userService.getCurrentUserId(), date));
     }
 
     @GetMapping("/today")
-    @Operation(summary = "获取今日待办")
+    @Operation(summary = "获取今日待办（未完成 + 今日已完成）")
     public Result<List<Todo>> getTodayTodos() {
-        // 从当前登录用户获取userId
-        Long userId = 1L; // 这里需要从SecurityContext中获取，暂时硬编码
-        List<Todo> todos = todoService.getTodayTodos(userId);
-        return Result.success(todos);
+        return Result.success(todoService.getTodayTodos(userService.getCurrentUserId()));
     }
 
     @PostMapping("/{id}/complete")
     @Operation(summary = "完成待办")
     public Result<Todo> completeTodo(@PathVariable Long id, @RequestParam String completionNote) {
-        Todo completedTodo = todoService.completeTodo(id, completionNote);
-        return Result.success(completedTodo);
+        return Result.success(todoService.completeTodo(id, userService.getCurrentUserId(), completionNote));
     }
-
-    }
+}

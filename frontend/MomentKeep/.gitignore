@@ -37,3 +37,6 @@ coverage/
 *.temp
 .temp/
 .tmp/
+
+# 本地 npm 缓存（全局缓存目录不可写时使用 --cache ./.npm-cache）
+.npm-cache/

@@ -7,10 +7,12 @@
  */
 package cn.edu.scnu.momentkeep.security;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -21,8 +23,12 @@ import java.util.Date;
  * JWT令牌工具类
  * 负责令牌的生成、验证和用户信息提取
  */
+@Slf4j
 @Component
 public class JwtTokenProvider {
+
+    /** 令牌中承载令牌版本号的声明名 */
+    public static final String CLAIM_TOKEN_VERSION = "tv";
 
     /** JWT签名密钥 */
     @Value("${jwt.secret.key}")
@@ -31,6 +37,10 @@ public class JwtTokenProvider {
     /** JWT过期时间（毫秒） */
     @Value("${jwt.expiration.time}")
     private Long jwtExpiration;
+
+    /** 签发方，用于防止不同系统间令牌串用 */
+    @Value("${jwt.issuer:momentkeep}")
+    private String issuer;
 
     /**
      * 获取签名密钥
@@ -48,19 +58,39 @@ public class JwtTokenProvider {
 
     /**
      * 生成JWT令牌
-     * @param userDetails 用户详情
+     *
+     * @param username     用户名
+     * @param tokenVersion 用户当前的令牌版本号，登出/改密后版本自增即可让旧令牌失效
      * @return JWT令牌字符串
      */
-    public String generateToken(UserDetails userDetails) {
+    public String generateToken(String username, Integer tokenVersion) {
         Date now = new Date();
         Date expirationDate = new Date(now.getTime() + jwtExpiration);
 
         return Jwts.builder()
-                .claim("sub", userDetails.getUsername())
-                .claim("iat", now)
-                .claim("exp", expirationDate)
+                .subject(username)
+                .issuer(issuer)
+                .issuedAt(now)
+                .expiration(expirationDate)
+                .claim(CLAIM_TOKEN_VERSION, tokenVersion == null ? 0 : tokenVersion)
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    /**
+     * 解析令牌载荷（不校验过期以外的业务规则）
+     *
+     * @param token JWT令牌
+     * @return 载荷
+     * @throws JwtException 令牌非法或已过期
+     */
+    public Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .requireIssuer(issuer)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     /**
@@ -69,12 +99,27 @@ public class JwtTokenProvider {
      * @return 用户名
      */
     public String getUsernameFromToken(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+        return parseClaims(token).getSubject();
+    }
+
+    /**
+     * 从令牌中提取令牌版本号
+     * @param token JWT令牌
+     * @return 令牌版本号，缺失时返回 0
+     */
+    public Integer getTokenVersion(String token) {
+        Object value = parseClaims(token).get(CLAIM_TOKEN_VERSION);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        return 0;
     }
 
     /**
@@ -84,12 +129,11 @@ public class JwtTokenProvider {
      */
     public boolean validateToken(String token) {
         try {
-            Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token);
+            parseClaims(token);
             return true;
-        } catch (Exception e) {
+        } catch (JwtException | IllegalArgumentException e) {
+            // 区分过期与非法，便于排查问题（不打印令牌内容）
+            log.debug("JWT 校验失败：{}", e.getMessage());
             return false;
         }
     }
