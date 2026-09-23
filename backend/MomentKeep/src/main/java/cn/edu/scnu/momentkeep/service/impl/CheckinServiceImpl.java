@@ -31,6 +31,19 @@ public class CheckinServiceImpl implements CheckinService {
     
     @Override
     public Checkin saveCheckin(Checkin checkin) {
+
+        /*
+         * 写入打卡去重键。
+         * 仅"每日至多一次"的类型（early / sleep）取非空值，其余保持 NULL；
+         * 由唯一索引 uk_checkin_dedupe 保证同一用户同一天只有一条，
+         * 重复提交会触发唯一键冲突 —— GlobalExceptionHandler 已将其转为
+         * 409「今天已经打过卡了，无需重复提交」，不会变成 500。
+         */
+        if ("early".equals(checkin.getType()) || "sleep".equals(checkin.getType())) {
+            LocalDateTime dedupeTime = checkin.getCheckinTime() != null
+                    ? checkin.getCheckinTime() : LocalDateTime.now();
+            checkin.setDedupeKey(checkin.getType() + "#" + dedupeTime.toLocalDate());
+        }
         checkinMapper.insert(checkin);
         return checkin;
     }
@@ -123,16 +136,51 @@ public class CheckinServiceImpl implements CheckinService {
     
     @Override
     public void deleteCheckin(Long userId, String type, LocalDate date) {
+        deleteCheckin(userId, type, date, null);
+    }
+
+    @Override
+    public void deleteCheckin(Long userId, String type, LocalDate date, String time) {
+        // 记录级取消：只删与指定时间完全相同的那一条
+        if (time != null && !time.trim().isEmpty()) {
+            LocalDateTime target = parseFlexibleDateTime(time);
+            if (target != null) {
+                LambdaQueryWrapper<Checkin> one = new LambdaQueryWrapper<>();
+                one.eq(Checkin::getUserId, userId)
+                        .eq(Checkin::getType, type)
+                        .eq(Checkin::getCheckinTime, target);
+                checkinMapper.delete(one);
+                return;
+            }
+            // 时间无法解析时不抛错，退回"按天删除"：宁可删多，也不给用户 500
+        }
+
+        // 原有语义：删除该用户该类型在当天的全部记录
         LocalDateTime startOfDay = date.atStartOfDay();
         LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-        
+
         LambdaQueryWrapper<Checkin> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Checkin::getUserId, userId)
                 .eq(Checkin::getType, type)
                 .ge(Checkin::getCheckinTime, startOfDay)
                 .le(Checkin::getCheckinTime, endOfDay);
-        
+
         checkinMapper.delete(queryWrapper);
+    }
+
+    /**
+     * 宽容解析前端传来的时间。
+     *
+     * @description 前端可能传 "yyyy-MM-dd HH:mm:ss"（后端返回的原样）或
+     *              ISO 的 "yyyy-MM-ddTHH:mm:ss"，把空格替换成 T 即可同时兼容。
+     *              解析失败返回 null，由调用方决定降级策略，不在这里抛错。
+     */
+    private LocalDateTime parseFlexibleDateTime(String time) {
+        try {
+            return LocalDateTime.parse(time.trim().replace(' ', 'T'));
+        } catch (Exception e) {
+            return null;
+        }
     }
     
     @Override

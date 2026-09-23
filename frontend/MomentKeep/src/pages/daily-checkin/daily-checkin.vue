@@ -78,7 +78,7 @@
             </div>
           </div>
           <div class="checkin-records" v-else>
-            <div v-for="(meal, index) in checkins.meals" :key="index" class="checkin-record">
+            <div v-for="(meal, index) in checkins.meals" :key="index" class="checkin-record stagger-item">
               <div class="checkin-record-info">
                 <div class="checkin-time">{{ meal.time }}</div>
                 <div class="meal-type-text">{{ meal.type }}</div>
@@ -135,7 +135,7 @@
             </div>
           </div>
           <div class="checkin-records" v-else>
-            <div v-for="(exercise, index) in checkins.exercises" :key="index" class="checkin-record">
+            <div v-for="(exercise, index) in checkins.exercises" :key="index" class="checkin-record stagger-item">
               <div class="checkin-record-info">
                 <div class="checkin-time">{{ exercise.time }}</div>
                 <div class="exercise-type-text">{{ exercise.type }}</div>
@@ -177,11 +177,11 @@
           <div class="time-slots">
             <div class="time-slot">
               <div class="time-slot-header">
-                <div class="time-slot-title">清晨 (0-6点)</div>
+                <div class="time-slot-title">清晨 0–6 点</div>
               </div>
               <div class="time-slot-content">
                 <div v-if="timeDistribution.morning.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in timeDistribution.morning" :key="index" class="checkin-item">
+                  <div v-for="(item, index) in timeDistribution.morning" :key="index" class="checkin-item stagger-item">
                     <span class="checkin-type">{{ item.type }}</span>
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
@@ -192,11 +192,11 @@
             
             <div class="time-slot">
               <div class="time-slot-header">
-                <div class="time-slot-title">上午 (7-12点)</div>
+                <div class="time-slot-title">上午 7–12 点</div>
               </div>
               <div class="time-slot-content">
                 <div v-if="timeDistribution.midMorning.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in timeDistribution.midMorning" :key="index" class="checkin-item">
+                  <div v-for="(item, index) in timeDistribution.midMorning" :key="index" class="checkin-item stagger-item">
                     <span class="checkin-type">{{ item.type }}</span>
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
@@ -207,11 +207,11 @@
             
             <div class="time-slot">
               <div class="time-slot-header">
-                <div class="time-slot-title">下午 (13-18点)</div>
+                <div class="time-slot-title">下午 13–18 点</div>
               </div>
               <div class="time-slot-content">
                 <div v-if="timeDistribution.afternoon.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in timeDistribution.afternoon" :key="index" class="checkin-item">
+                  <div v-for="(item, index) in timeDistribution.afternoon" :key="index" class="checkin-item stagger-item">
                     <span class="checkin-type">{{ item.type }}</span>
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
@@ -222,11 +222,11 @@
             
             <div class="time-slot">
               <div class="time-slot-header">
-                <div class="time-slot-title">晚上 (19-24点)</div>
+                <div class="time-slot-title">晚上 19–24 点</div>
               </div>
               <div class="time-slot-content">
                 <div v-if="timeDistribution.evening.length > 0" class="checkin-items">
-                  <div v-for="(item, index) in timeDistribution.evening" :key="index" class="checkin-item">
+                  <div v-for="(item, index) in timeDistribution.evening" :key="index" class="checkin-item stagger-item">
                     <span class="checkin-type">{{ item.type }}</span>
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
@@ -596,7 +596,7 @@ const distributionTagline = computed(() => {
     checkins.exercises.length
   
   if (totalCheckins === 0) {
-    return '今天还没有打卡记录，慢慢来，让我们一起记录生活的美好瞬间吧～'
+    return '今天还没有打卡，点上面的按钮记一条。'
   }
   
   // 早起打卡时间分析
@@ -629,12 +629,12 @@ const distributionTagline = computed(() => {
   
   // 早起打卡集中在6-8点
   if (earlyHour >= 6 && earlyHour < 8) {
-    return '自律的清晨时光，为你的一天注入满满活力，真棒！'
+    return '6–8 点完成早起打卡。'
   }
   
   // 睡眠打卡在22点后
   if (sleepHour >= 22 || sleepHour < 1) {
-    return '早睡早起身体好，你已经养成了健康的作息习惯，继续保持！'
+    return '22 点后完成睡眠打卡。'
   }
   
   // 用餐打卡分布均匀
@@ -644,7 +644,7 @@ const distributionTagline = computed(() => {
     const hasEveningMeal = mealHours.some(hour => hour >= 18 || hour < 1)
     
     if (hasMorningMeal && hasAfternoonMeal && hasEveningMeal) {
-      return '饮食规律，好好吃饭，你的生活充满了仪式感～'
+      return '早、中、晚三餐都已打卡。'
     }
   }
   
@@ -652,7 +652,7 @@ const distributionTagline = computed(() => {
   if (exerciseHours.length > 0) {
     const eveningExercises = exerciseHours.filter(hour => hour >= 17 && hour < 22)
     if (eveningExercises.length === exerciseHours.length) {
-      return '傍晚运动，释放一天的压力，活力满满的你最棒！'
+      return '17–22 点完成运动打卡。'
     }
   }
   
@@ -672,7 +672,7 @@ const distributionTagline = computed(() => {
     ]
     
     if (timeRanges.filter(Boolean).length >= 3) {
-      return '生活充实，节奏丰富，每一刻都值得记录～'
+      return '打卡分散在 3 个以上时段。'
     }
   }
   
@@ -695,7 +695,7 @@ const historyTagline = computed(() => {
   const totalCount = historySummary.value.total || 0
 
   if (totalCount === 0) {
-    return '还没有历史打卡记录，让我们开始记录生活的点滴吧～'
+    return '还没有历史打卡记录。'
   }
 
   // 有打卡记录的时段数量（12 个 2 小时桶）
@@ -814,7 +814,6 @@ const checkin = async (type) => {
     loading.value = true
 
     const response = await post('/checkin', checkinData, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -861,6 +860,8 @@ const checkin = async (type) => {
         date: date
       })
       removeCache('checkinStats_' + date)
+      // 同步失效统计卡片实际使用的缓存键（两者此前不一致，导致打卡后统计不更新）
+      removeCache('checkin_stats')
 
       await fetchCheckinStats()
 
@@ -976,7 +977,6 @@ const cancelCheckin = async (type) => {
 
     const date = getCurrentDate()
     const response = await del(`/checkin?type=${type}&date=${date}`, {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -1072,9 +1072,17 @@ const cancelMealCheckin = async (index) => {
     loading.value = true
     
     const date = getCurrentDate()
-    // 调用API删除打卡记录
-    const response = await del(`/checkin?type=meal&date=${date}`, {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
+    /*
+     * 带上这一条记录的时间，后端只删它。
+     * 不带的话后端会删除"今天该类型的全部记录"——用户有两条用餐记录时，
+     * 点其中一条的 × 会把另一条也删掉（数据静默丢失）。
+     * 取不到时间则不传，自动退回旧行为。
+     */
+    const targetMeal = (checkins.meals && checkins.meals[index]) || {}
+    const mealTime = targetMeal.checkinTime
+      ? `&time=${encodeURIComponent(targetMeal.checkinTime)}`
+      : ''
+    const response = await del(`/checkin?type=meal&date=${date}${mealTime}`, {}, {
     })
     
     if (response.code === 200) {
@@ -1136,9 +1144,12 @@ const cancelExerciseCheckin = async (index) => {
     loading.value = true
     
     const date = getCurrentDate()
-    // 调用API删除打卡记录
-    const response = await del(`/checkin?type=exercise&date=${date}`, {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
+    // 同上：只取消这一条，而不是"今天运动打卡全部取消"
+    const targetExercise = (checkins.exercises && checkins.exercises[index]) || {}
+    const exerciseTime = targetExercise.checkinTime
+      ? `&time=${encodeURIComponent(targetExercise.checkinTime)}`
+      : ''
+    const response = await del(`/checkin?type=exercise&date=${date}${exerciseTime}`, {}, {
     })
     
     if (response.code === 200) {
@@ -1197,7 +1208,6 @@ const fetchCheckins = async () => {
 
   try {
     const response = await get(`/checkin/by-date?date=${date}`, {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -1262,10 +1272,20 @@ const fetchCheckinStats = async () => {
   }
 
   const cacheKey = 'checkin_stats'
+  /*
+   * 读取前先失效。
+   *
+   * 统计卡片依赖"打卡/取消打卡"刚刚产生的结果，而各写路径分散在多处
+   * （打卡、再次打卡、取消、按类型取消……），此前只在其中一处清了缓存，
+   * 其余路径会拿到最长 5 分钟的旧统计（打卡率、次数与真实数据不符）。
+   * 与其在每处写完后逐一补失效（新增写路径时又容易漏），
+   * 不如让这个幂等的小接口每次读取都以服务端为准 —— 代价是每次进入页面多一次
+   * 轻量请求，换取"统计永远与刚做的操作一致"，这笔账划得来。
+   */
+  removeCache(cacheKey)
 
   const fetchFn = async () => {
     const response = await get('/checkin/stats', {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
     
     if (response.code === 200) {
@@ -1322,7 +1342,7 @@ onMounted(async () => {
 .checkin-loading {
   padding: 12px 0;
   text-align: center;
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-muted, #999999);
 }
 
@@ -1331,20 +1351,20 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .checkin-card {
   background-color: var(--surface-color, #F2EEE8);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-interactive);
 }
 
 .checkin-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
 }
 
 .checkin-card.checked {
@@ -1365,13 +1385,13 @@ onMounted(async () => {
   right: 0;
   background-color: #C2977F;
   color: white;
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
 }
 
 .checkin-icon {
-  font-size: calc(24px * var(--font-scale, 1));
+  font-size: var(--fs-2xl);
   margin-right: 12px;
   color: var(--text-secondary, #666666);
   transition: color 0.3s ease;
@@ -1383,34 +1403,34 @@ onMounted(async () => {
 
 /* 图标样式已迁到全局 src/styles/icons.css（自绘 base64 PNG） */
 .checkin-title {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
 }
 
 .checkin-time {
   margin-bottom: 16px;
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
 }
 
 .meal-type-text, .exercise-type-text {
   display: block;
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-muted, #999999);
   margin-top: 4px;
 }
 
 .checkin-btn {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   background-color: #94A7C8;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: calc(14px * var(--font-scale, 1));
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   font-weight: 500;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
   cursor: pointer;
 }
 
@@ -1425,7 +1445,7 @@ onMounted(async () => {
 
 .checkin-actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   margin-top: 16px;
 }
 
@@ -1447,9 +1467,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px 12px;
   background-color: rgba(194, 151, 127, 0.05);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-bottom: 8px;
 }
 
@@ -1460,11 +1480,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .checkin-record .checkin-time {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-color, #333333);
   min-width: 50px;
   /* 旧上下堆叠布局遗留的 16px 下边距：改为横向排列后，
@@ -1474,7 +1494,7 @@ onMounted(async () => {
 
 .checkin-record .meal-type-text,
 .checkin-record .exercise-type-text {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-secondary, #666666);
   margin-top: 0;
 }
@@ -1482,22 +1502,22 @@ onMounted(async () => {
 .checkin-record-cancel {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   border: 1px solid #e0e0e0;
   background-color: var(--surface-strong, #FFFFFF);
   color: var(--text-muted, #999999);
-  font-size: calc(18px * var(--font-scale, 1));
+  font-size: var(--fs-lg);
   line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .checkin-record-cancel:hover {
-  background-color: #ff4d4f;
-  border-color: #ff4d4f;
+  background-color: var(--danger-color, #B5544A);
+  border-color: var(--danger-color, #B5544A);
   color: white;
 }
 
@@ -1516,12 +1536,12 @@ onMounted(async () => {
 .meal-type, .exercise-type {
   padding: 8px 12px;
   background-color: var(--surface-strong, #FFFFFF);
-  border: 1px solid var(--sidebar-border, var(--border-color, #D8C8BE));
-  border-radius: 6px;
+  border: 1px solid var(--sidebar-border, var(--border-color, var(--border-color, #D8C8BE)));
+  border-radius: var(--radius-sm);
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: calc(14px * var(--font-scale, 1));
+  transition: var(--transition-interactive);
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
 }
 
@@ -1544,22 +1564,22 @@ onMounted(async () => {
 /* 数据统计 */
 .stats-section {
   background-color: var(--sidebar-bg, #F2EEE8);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 /* 历史打卡时间分布 */
 .history-distribution-section {
   background-color: var(--sidebar-bg, #F2EEE8);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
   margin-top: 20px;
 }
 
 .section-title {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
   margin-bottom: 16px;
@@ -1575,19 +1595,19 @@ onMounted(async () => {
 
 .stat-card {
   background-color: var(--surface-strong, #FFFFFF);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-title {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
   margin-bottom: 8px;
 }
 
 .stat-value {
-  font-size: calc(20px * var(--font-scale, 1));
+  font-size: var(--fs-xl);
   font-weight: 600;
   color: var(--primary-color, #C2977F);
   margin-bottom: 8px;
@@ -1596,44 +1616,44 @@ onMounted(async () => {
 .stat-chart {
   height: 8px;
   background-color: #F0F0F0;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 
 .chart-bar {
   height: 100%;
   background-color: var(--primary-color, #C2977F);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   transition: width 0.5s ease;
 }
 
 /* 时间分布模块样式 */
 .time-distribution-section {
   background-color: var(--sidebar-bg, #F2EEE8);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  margin-bottom: 30px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 32px;
 }
 
 .distribution-card {
   background-color: var(--surface-strong, #FFFFFF)FF;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
   border: 1px solid #E8D5C4;
 }
 
 .distribution-tagline {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--primary-color, #C2977F);
   text-align: center;
   margin-bottom: 16px;
   line-height: 1.4;
   font-weight: 500;
-  padding: 10px 12px;
+  padding: 12px 12px;
   background-color: rgba(194, 151, 127, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 /* 历史分布卡片头：左=统计范围切换，右=总量 + 查看全部入口 */
@@ -1642,7 +1662,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap; /* 窄屏自动换行，不撑宽卡片 */
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -1650,17 +1670,17 @@ onMounted(async () => {
   display: flex;
   padding: 2px;
   background-color: rgba(194, 151, 127, 0.12);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
 }
 
 .range-item {
-  padding: 5px 14px;
-  font-size: calc(12px * var(--font-scale, 1));
+  padding: 4px 16px;
+  font-size: var(--fs-xs);
   color: #8a7a6d;
-  border-radius: 14px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.25s ease;
+  transition: var(--transition-interactive);
 }
 
 .range-item.active {
@@ -1678,14 +1698,14 @@ onMounted(async () => {
 
 .scope-item {
   padding: 4px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border-color-light, #E8E4DE);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-color-light, var(--border-color-light, #E8E4DE));
   background-color: var(--surface-strong, #FFFFFF);
   color: var(--text-secondary, #666666);
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: var(--transition-interactive);
 }
 
 .scope-item.active {
@@ -1701,12 +1721,12 @@ onMounted(async () => {
 }
 
 .chart-total {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-muted, #999999);
 }
 
 .view-all {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--primary-color, #C2977F);
   cursor: pointer;
   white-space: nowrap;
@@ -1726,10 +1746,10 @@ onMounted(async () => {
 
 .time-slot {
   border: 1px solid #E8D5C4;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background-color: var(--surface-strong, #FFFFFF);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .time-slot-header {
@@ -1742,19 +1762,19 @@ onMounted(async () => {
 }
 
 .time-slot-title {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   font-weight: 600;
   color: var(--text-color, #333333);
 }
 
 .time-slot-content {
-  padding: 14px;
+  padding: 16px;
 }
 
 .checkin-items {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .checkin-item {
@@ -1763,9 +1783,9 @@ onMounted(async () => {
   align-items: center;
   padding: 8px 12px;
   background-color: var(--surface-strong, #FFFFFF)FF;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1px solid #E8D5C4;
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
 }
 
 .checkin-type {
@@ -1776,7 +1796,7 @@ onMounted(async () => {
 
 .checkin-time {
   color: var(--text-secondary, #666666);
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   white-space: nowrap;
   margin-left: 12px;
 }
@@ -1784,7 +1804,7 @@ onMounted(async () => {
 .empty-checkin {
   text-align: center;
   color: var(--text-muted, #999999);
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   padding: 12px 0;
   font-style: italic;
 }
@@ -1798,13 +1818,13 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 12px 16px;
   background-color: rgba(194, 151, 127, 0.1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color 0.3s ease;
   border: 1px solid #E8D5C4;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .type-group-header:hover {
@@ -1817,13 +1837,13 @@ onMounted(async () => {
 }
 
 .type-count {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: #666;
   margin-left: 8px;
 }
 
 .expand-icon {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: #666;
   transition: transform 0.3s ease;
 }
@@ -1844,11 +1864,11 @@ onMounted(async () => {
   background-color: var(--surface-color, #F2EEE8);
   border: 1px solid #C2977F;
   color: #C2977F;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: calc(12px * var(--font-scale, 1));
+  padding: 8px 12px;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-xs);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .more-btn:hover {
@@ -1872,10 +1892,10 @@ onMounted(async () => {
 
 .modal-content {
   background-color: var(--surface-strong, #FFFFFF);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   width: 90%;
   max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-xl);
 }
 
 .modal-header {
@@ -1887,13 +1907,13 @@ onMounted(async () => {
 }
 
 .modal-header h3 {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
 }
 
 .close-icon {
-  font-size: calc(20px * var(--font-scale, 1));
+  font-size: var(--fs-xl);
   cursor: pointer;
   color: var(--text-muted, #999999);
 }
@@ -1904,10 +1924,10 @@ onMounted(async () => {
 
 .modal-body input {
   width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--border-color, #D8C8BE);
-  border-radius: 8px;
-  font-size: calc(14px * var(--font-scale, 1));
+  padding: 12px 16px;
+  border: 1px solid var(--border-color, var(--border-color, #D8C8BE));
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   color: var(--text-color, #333333);
 }
 
@@ -1916,16 +1936,16 @@ onMounted(async () => {
   justify-content: flex-end;
   padding: 16px 20px;
   border-top: 1px solid #f0f0f0;
-  gap: 10px;
+  gap: 12px;
 }
 
 .modal-footer button {
   padding: 8px 16px;
   border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  font-size: calc(14px * var(--font-scale, 1));
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-body);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .cancel-btn {
@@ -1954,4 +1974,13 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==== 设计修订（覆盖规则，勿手改上面旧值） ==== */
+/* 时间范围/统计口径胶囊同样过扁，纵向内边距提到 10px */
+.range-item,
+.scope-item {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
 </style>

@@ -51,12 +51,12 @@ public class FocusServiceImpl implements FocusService {
 
         QueryWrapper<FocusRecord> todayQuery = new QueryWrapper<>();
         todayQuery.eq("user_id", userId)
-                .ge("start_time", startOfToday);
+                .ge("start_time", startOfToday).lt("start_time", LocalDate.now().plusDays(1).atStartOfDay());
         List<FocusRecord> todayRecords = focusRecordMapper.selectList(todayQuery);
 
         QueryWrapper<FocusRecord> weekQuery = new QueryWrapper<>();
         weekQuery.eq("user_id", userId)
-                .ge("start_time", startOfWeekDateTime);
+                .ge("start_time", startOfWeekDateTime).lt("start_time", LocalDate.now().plusDays(1).atStartOfDay());
         List<FocusRecord> weekRecords = focusRecordMapper.selectList(weekQuery);
 
         QueryWrapper<FocusRecord> totalQuery = new QueryWrapper<>();

@@ -47,4 +47,14 @@ public class Checkin {
     
     @Version
     private Integer version;
+
+    /**
+     * 打卡去重键。
+     *
+     * @description 仅"每日至多一次"的类型（early / sleep）写入非空值（type#日期），
+     *              由数据库唯一索引 uk_checkin_dedupe 保证同一用户同一天只有一条记录；
+     *              用餐 / 运动保持 NULL —— 唯一索引允许多个 NULL，因此不受任何限制。
+     *              用普通列而非生成列：TiDB 不支持通过 ALTER TABLE 添加生成列（ERROR 3106）。
+     */
+    private String dedupeKey;
 }

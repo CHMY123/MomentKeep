@@ -17,7 +17,8 @@
         <div 
           v-for="countdown in countdowns" 
           :key="countdown.id"
-          class="countdown-card"
+          class="countdown-card stagger-item"
+          :class="{ 'is-urgent': !countdown.isPast && countdown.days <= 3, 'is-past': countdown.isPast }"
           :style="{ borderLeftColor: countdown.color }"
         >
           <div class="countdown-header">
@@ -51,7 +52,8 @@
         </div>
         <!-- 仅在"加载完成且确实没有数据"时才提示空态，避免加载中误报 -->
         <div v-if="!loading && countdowns.length === 0" class="empty-countdown">
-          <span>暂无倒计时，点击上方按钮添加一个吧</span>
+          <div class="empty-graphic-list"></div>
+          <span>还没有倒计时 · 点击上方按钮添加</span>
         </div>
       </div>
       
@@ -247,7 +249,6 @@ const fetchCountdowns = async () => {
     }
 
     const response = await get('/countdown', {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -339,7 +340,6 @@ const saveCountdownWithTargetDate = async (targetDate) => {
         targetTime: toLocalDateTime(targetDate),
         color: formData.color
       }, {
-        'Authorization': `Bearer ${userStore.getToken}`
       })
     } else {
       response = await post('/countdown', {
@@ -348,7 +348,6 @@ const saveCountdownWithTargetDate = async (targetDate) => {
         targetTime: toLocalDateTime(targetDate),
         color: formData.color
       }, {
-        'Authorization': `Bearer ${userStore.getToken}`
       })
     }
     
@@ -380,7 +379,7 @@ const saveCountdownWithTargetDate = async (targetDate) => {
         uni.navigateTo({ url: '/pages/login/login' })
       }, 1000)
     } else {
-      uni.showToast({ title: '操作失败', icon: 'none' })
+      uni.showToast({ title: '保存失败，请重试', icon: 'none' })
     }
   } catch (error) {
     uni.showToast({ title: error.message || '网络错误', icon: 'none' })
@@ -417,7 +416,7 @@ const saveCountdown = async () => {
     // 弹出确认对话框
     uni.showModal({
       title: '提示',
-      content: '选择的时间是过去的时间，确定要继续吗？',
+      content: '这个日期已经过去了，仍要添加吗？',
       success: (res) => {
         if (res.confirm) {
           // 用户确认，继续保存
@@ -454,7 +453,6 @@ const deleteCountdown = (id) => {
       if (res.confirm) {
         try {
           const response = await del(`/countdown/${id}`, {}, {
-            'Authorization': `Bearer ${userStore.getToken}`
           })
           
           if (response.code === 200) {
@@ -469,7 +467,7 @@ const deleteCountdown = (id) => {
               uni.navigateTo({ url: '/pages/login/login' })
             }, 1000)
           } else {
-            uni.showToast({ title: '删除失败', icon: 'none' })
+            uni.showToast({ title: '删除失败，请重试', icon: 'none' })
           }
         } catch (error) {
           uni.showToast({ title: error.message || '网络错误', icon: 'none' })
@@ -493,8 +491,8 @@ const updateCountdowns = () => {
   
   // 按时间排序
   countdowns.value.sort((a, b) => {
-    const dateA = new Date(a.targetTime)
-    const dateB = new Date(b.targetTime)
+    const dateA = parseDateTime(a.targetTime)
+    const dateB = parseDateTime(b.targetTime)
     return dateA - dateB
   })
 }
@@ -535,11 +533,11 @@ onUnmounted(() => {
   background-color: #C2977F;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   font-weight: 500;
   margin-bottom: 20px;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .add-countdown-btn:hover {
@@ -554,17 +552,62 @@ onUnmounted(() => {
 }
 
 .countdown-card {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
   border-left: 4px solid #C2977F;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .countdown-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
+}
+
+/*
+ * 紧急度即视觉重量 —— 本页的视线锚点
+ *
+ * 此前所有倒计时卡片的留白、字号、字重完全一致：不管还剩 3 天还是 300 天，
+ * 观感上同样重要，整页没有落点，用户得逐张读数字才知道哪个要先做。
+ * 这里用「剩余天数」这一真实数据驱动层级：
+ *   剩余 ≤3 天 → 加大留白、放大数字、加粗左色条，在尺寸上"跳出来"
+ *   已过期     → 降透明度、左色条转灰、数字回落到常规字重，退为背景信息
+ *
+ * 【两点实现说明】
+ * 1) 用数据而不是 :nth-child 判断——列表并未按紧急度排序，
+ *    按位置放大等于随机放大某一张。
+ * 2) 用 em 而非固定 px 做放大——时间的基准字号由卡片自身决定，
+ *    写死 px 可能反而比原值更小（那就成了"越紧急越小"）。
+ *    1.15em 永远在原有基础上放大，与基准值无关。
+ */
+.countdown-card.is-urgent {
+  padding: 24px;
+  border-left-width: 6px;
+  box-shadow: var(--shadow-lg, 0 4px 16px rgba(0, 0, 0, 0.08));
+}
+
+.countdown-card.is-urgent .countdown-title {
+  font-size: 1.12em;
+  font-weight: var(--fw-bold, 600);
+}
+
+.countdown-card.is-urgent .time-number {
+  font-size: 1.15em;
+  color: var(--primary-color, #C2977F);
+}
+
+.countdown-card.is-past {
+  opacity: 0.72;
+  /* 卡片左色条是由模版 :style 内联设置的，内联优先于样式表，必须 !important 才能压过去 */
+  border-left-color: #9A9A9A !important;
+  box-shadow: var(--shadow-sm, 0 1px 4px rgba(0, 0, 0, 0.05));
+}
+
+.countdown-card.is-past .time-number {
+  color: var(--text-color, #333333);
+  font-weight: var(--fw-normal, 400);
+  opacity: 0.55;
 }
 
 .countdown-header {
@@ -575,9 +618,9 @@ onUnmounted(() => {
 }
 
 .countdown-title {
-  font-size: 18px;
+  font-size: var(--fs-lg);
   font-weight: 600;
-  color: #333333;
+  color: var(--text-color, #333333);
   flex: 1;
 }
 
@@ -602,9 +645,9 @@ onUnmounted(() => {
 }
 
 .countdown-status {
-  color: #ff4d4f;
-  font-size: 14px;
-  margin-bottom: 10px;
+  color: var(--danger-color, #B5544A);
+  font-size: var(--fs-body);
+  margin-bottom: 12px;
   font-weight: 500;
 }
 
@@ -613,20 +656,20 @@ onUnmounted(() => {
 }
 
 .time-number {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   color: #C2977F;
   display: block;
 }
 
 .time-unit {
-  font-size: 12px;
-  color: #666666;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary, #666666);
 }
 
 .countdown-info {
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--fs-body);
+  color: var(--text-secondary, #666666);
 }
 
 .countdown-date {
@@ -635,8 +678,8 @@ onUnmounted(() => {
 }
 
 .countdown-description {
-  font-size: 12px;
-  color: #999999;
+  font-size: var(--fs-xs);
+  color: var(--text-muted, #999999);
   line-height: 1.4;
 }
 
@@ -646,14 +689,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 48px 20px;
-  background-color: #F2EEE8;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 
 .state-text {
-  font-size: 14px;
-  color: #999999;
+  font-size: var(--fs-body);
+  color: var(--text-muted, #999999);
   text-align: center;
   line-height: 1.6;
 }
@@ -661,22 +704,22 @@ onUnmounted(() => {
 .empty-countdown {
   text-align: center;
   padding: 40px 0;
-  color: #999999;
-  font-size: 14px;
-  background-color: #F2EEE8;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  color: var(--text-muted, #999999);
+  font-size: var(--fs-body);
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 
 /* 图标样式 */
 .add-icon {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   color: white;
 }
 
 .add-icon::before {
   content: "+";
-  font-weight: bold;
+  font-weight: var(--fw-bold); /* 原为 bold(700)，归一为 600 */
 }
 
 /* 操作图标 */
@@ -686,7 +729,7 @@ onUnmounted(() => {
 }
 
 .action-icon {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   cursor: pointer;
   transition: color 0.3s ease;
 }
@@ -722,12 +765,12 @@ onUnmounted(() => {
 }
 
 .modal-content {
-  background-color: white;
-  border-radius: 12px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border-radius: var(--radius-md);
   padding: 20px;
   width: 90%;
   max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-xl);
   max-height: 80vh;
   overflow-y: auto;
 }
@@ -740,21 +783,21 @@ onUnmounted(() => {
 }
 
 .modal-header h3 {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin: 0;
 }
 
 .close-icon {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   cursor: pointer;
-  color: #999999;
+  color: var(--text-muted, #999999);
   transition: color 0.3s ease;
 }
 
 .close-icon:hover {
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .modal-body {
@@ -765,9 +808,9 @@ onUnmounted(() => {
 .modal-body textarea {
   width: 100%;
   padding: 12px;
-  border: 1px solid #D8C8BE;
-  border-radius: 8px;
-  font-size: 14px;
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   margin-bottom: 12px;
   box-sizing: border-box;
   line-height: 1.6;
@@ -792,11 +835,11 @@ onUnmounted(() => {
 }
 
 .picker-box {
-  padding: 10px;
-  border: 1px solid #D8C8BE;
-  border-radius: 8px;
-  font-size: 14px;
-  background-color: #FFFFFF;
+  padding: 12px;
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
+  background-color: var(--surface-strong, #FFFFFF)FF;
   text-align: center;
 }
 
@@ -814,16 +857,16 @@ onUnmounted(() => {
 .modal-footer button {
   padding: 8px 16px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .cancel-btn {
-  background-color: #F2EEE8;
-  color: #666666;
+  background-color: var(--surface-color, #F2EEE8);
+  color: var(--text-secondary, #666666);
 }
 
 .cancel-btn:hover {
@@ -846,8 +889,8 @@ onUnmounted(() => {
 
 .color-label {
   display: block;
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--fs-body);
+  color: var(--text-secondary, #666666);
   margin-bottom: 8px;
 }
 
@@ -859,9 +902,9 @@ onUnmounted(() => {
 .color-option {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
   border: 2px solid transparent;
 }
 
@@ -870,7 +913,7 @@ onUnmounted(() => {
 }
 
 .color-option.selected {
-  border-color: #333333;
+  border-color: var(--text-color, #333333);
 }
 
 /* 响应式设计 */
@@ -880,7 +923,15 @@ onUnmounted(() => {
   }
   
   .time-number {
-    font-size: 20px;
+    font-size: var(--fs-xl);
   }
 }
+
+/* ==== 设计修订（覆盖规则，勿手改上面旧值） ==== */
+/* 同上：编辑 / 删除图标热区补齐到 44px（视觉不变） */
+.action-icon {
+  padding: 10px;
+  margin: -10px;
+}
+
 </style>

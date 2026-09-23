@@ -72,27 +72,27 @@
 .doc-page {
   width: 100%;
   box-sizing: border-box;
-  padding: 16px 14px 32px;
+  padding: 16px 16px 32px;
   background-color: #f8f6f2;
 }
 
 .doc-head {
   padding-bottom: 12px;
-  border-bottom: 1px solid #e8e4de;
-  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-color-light, #E8E4DE);
+  margin-bottom: 16px;
 }
 
 .doc-title {
-  font-size: 19px;
+  font-size: var(--fs-lg);
   font-weight: 600;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .doc-meta {
   display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: #999999;
+  margin-top: 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted, #999999);
 }
 
 .doc-body {
@@ -102,14 +102,14 @@
 
 .h {
   margin: 16px 0 8px;
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
   color: #c2977f;
 }
 
 .p {
   margin-bottom: 8px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1.75;
   color: #444444;
   text-align: justify;
@@ -118,12 +118,12 @@
 .doc-foot {
   margin-top: 24px;
   padding-top: 12px;
-  border-top: 1px solid #e8e4de;
+  border-top: 1px solid var(--border-color-light, #E8E4DE);
   text-align: center;
 }
 
 .foot-text {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #aaaaaa;
 }
 </style>

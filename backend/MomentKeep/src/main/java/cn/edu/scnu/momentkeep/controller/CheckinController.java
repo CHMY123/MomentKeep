@@ -84,9 +84,15 @@ public class CheckinController {
      */
     @DeleteMapping
     @Operation(summary = "取消打卡")
-    public Result<String> deleteCheckin(@RequestParam String type, @RequestParam String date) {
+    public Result<String> deleteCheckin(@RequestParam String type,
+                                        @RequestParam String date,
+                                        @RequestParam(required = false) String time) {
         LocalDate checkinDate = LocalDate.parse(date);
-        checkinService.deleteCheckin(userService.getCurrentUserId(), type, checkinDate);
+        /*
+         * time 为可选参数：传了则只取消那一条记录，不传则维持原语义（取消该类型当天全部）。
+         * 加可选参数而不是改必填，是为了向后兼容——老客户端不传仍能正常工作。
+         */
+        checkinService.deleteCheckin(userService.getCurrentUserId(), type, checkinDate, time);
         return Result.success("取消打卡成功");
     }
 

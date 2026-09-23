@@ -109,13 +109,13 @@
         <text class="state-hint">可以换个类型或调整时间范围再试试</text>
       </view>
 
-      <view v-for="group in groups" :key="group.date" class="day-group">
+      <view v-for="group in groups" :key="group.date" class="day-group stagger-item">
         <view class="day-header">
           <text class="day-title">{{ group.dateLabel }}</text>
           <text class="day-count">{{ group.items.length }} 条</text>
         </view>
         <view class="day-body">
-          <view v-for="item in group.items" :key="item.id" class="record-item">
+          <view v-for="item in group.items" :key="item.id" class="record-item stagger-item">
             <view class="record-left">
               <text class="record-type">{{ formatTypeLabel(item) }}</text>
               <text v-if="item.note" class="record-note">{{ item.note }}</text>
@@ -400,10 +400,10 @@ onMounted(() => {
 
 /* 筛选卡：与全站卡片风格统一 */
 .filter-card {
-  background-color: #f2eee8;
-  border-radius: 12px;
-  padding: 14px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-md);
 }
 
 .filter-row {
@@ -419,8 +419,8 @@ onMounted(() => {
 .filter-label {
   flex-shrink: 0;
   width: 44px;
-  padding-top: 5px;
-  font-size: 12px;
+  padding-top: 4px;
+  font-size: var(--fs-xs);
   color: #888888;
 }
 
@@ -432,10 +432,10 @@ onMounted(() => {
 }
 
 .chip {
-  padding: 5px 12px;
-  background-color: #ffffff;
-  border: 1px solid #d8c8be;
-  border-radius: 14px;
+  padding: 4px 12px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-pill);
 }
 
 .chip.active {
@@ -444,8 +444,8 @@ onMounted(() => {
 }
 
 .chip-text {
-  font-size: 12px;
-  color: #666666;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary, #666666);
 }
 
 .chip-text.active {
@@ -461,16 +461,16 @@ onMounted(() => {
 
 .date-box {
   flex: 1;
-  padding: 5px 10px;
-  background-color: #ffffff;
-  border: 1px solid #d8c8be;
-  border-radius: 8px;
+  padding: 4px 12px;
+  background-color: var(--surface-strong, #FFFFFF)ff;
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-sm);
   text-align: center;
 }
 
 .date-text {
-  font-size: 12px;
-  color: #333333;
+  font-size: var(--fs-xs);
+  color: var(--text-color, #333333);
 }
 
 .date-text.placeholder {
@@ -478,8 +478,8 @@ onMounted(() => {
 }
 
 .date-sep {
-  font-size: 12px;
-  color: #999999;
+  font-size: var(--fs-xs);
+  color: var(--text-muted, #999999);
 }
 
 /* 统计条 */
@@ -487,16 +487,16 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 4px;
+  padding: 12px 4px;
 }
 
 .summary-text {
-  font-size: 12px;
-  color: #666666;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary, #666666);
 }
 
 .summary-reset {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #c2977f;
 }
 
@@ -514,13 +514,13 @@ onMounted(() => {
 }
 
 .state-text {
-  font-size: 14px;
-  color: #999999;
+  font-size: var(--fs-body);
+  color: var(--text-muted, #999999);
 }
 
 .state-hint {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #bbbbbb;
 }
 
@@ -532,33 +532,33 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 4px;
+  padding: 8px 4px;
 }
 
 .day-title {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   color: #c2977f;
 }
 
 .day-count {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: #aaaaaa;
 }
 
 .day-body {
-  background-color: #f2eee8;
-  border-radius: 12px;
-  padding: 6px 14px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  box-shadow: var(--shadow-md);
 }
 
 .record-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid #e8e4de;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color-light, #E8E4DE);
 }
 
 .record-item:last-child {
@@ -569,23 +569,23 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   flex: 1;
-  margin-right: 10px;
+  margin-right: 12px;
 }
 
 .record-type {
-  font-size: 14px;
-  color: #333333;
+  font-size: var(--fs-body);
+  color: var(--text-color, #333333);
 }
 
 .record-note {
   margin-top: 4px;
-  font-size: 12px;
-  color: #999999;
+  font-size: var(--fs-xs);
+  color: var(--text-muted, #999999);
 }
 
 .record-time {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: #888888;
 }
 
@@ -595,7 +595,7 @@ onMounted(() => {
 }
 
 .footer-text {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #aaaaaa;
 }
 
@@ -603,4 +603,12 @@ onMounted(() => {
 .list-bottom-space {
   height: 24px;
 }
+
+/* ==== 设计修订（覆盖规则，勿手改上面旧值） ==== */
+/* 筛选胶囊原本上下只有 4px 内边距，高度约 24px，手指点不准 */
+.chip {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
 </style>

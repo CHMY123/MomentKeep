@@ -79,7 +79,7 @@
 
       <!-- 注册按钮 -->
       <button class="register-btn" @click="handleRegister" :disabled="loading">
-        {{ loading ? '注册中...' : '注册' }}
+        {{ loading ? '注册中…' : '注册' }}
       </button>
 
       <!-- 去登录 -->
@@ -203,10 +203,10 @@ const handleAgreementChange = (e) => {
 
 /* 注册卡片 */
 .register-card {
-  background-color: #fff;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 40px 30px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 40px 32px;
   width: 100%;
   max-width: 400px;
 }
@@ -232,14 +232,14 @@ const handleAgreementChange = (e) => {
 }
 
 .app-name {
-  font-size: 28px;
+  font-size: var(--fs-3xl);
   font-weight: 600;
   color: #C2977F;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .app-slogan {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #999;
 }
 
@@ -249,7 +249,7 @@ const handleAgreementChange = (e) => {
 }
 
 .label {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #333;
   margin-bottom: 8px;
   display: block;
@@ -259,9 +259,9 @@ const handleAgreementChange = (e) => {
   width: 100%;
   height: 50px;
   border: 2px solid #E8E1D6;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0 16px;
-  font-size: 16px;
+  font-size: var(--fs-md);
   box-sizing: border-box;
 }
 
@@ -277,9 +277,9 @@ const handleAgreementChange = (e) => {
 }
 
 .checkbox-text {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #666;
-  margin-left: 6px;
+  margin-left: 8px;
 }
 
 /* 注册按钮 */
@@ -288,8 +288,8 @@ const handleAgreementChange = (e) => {
   height: 50px;
   background-color: #C2977F;
   color: #fff;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   font-weight: 500;
   margin-top: 24px;
   display: block;
@@ -307,13 +307,13 @@ const handleAgreementChange = (e) => {
 .login-row {
   text-align: center;
   margin-top: 20px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #666;
 }
 
 .link {
   color: #C2977F;
-  margin-left: 6px;
-  font-size: 12px;
+  margin-left: 8px;
+  font-size: var(--fs-xs);
 }
 </style>

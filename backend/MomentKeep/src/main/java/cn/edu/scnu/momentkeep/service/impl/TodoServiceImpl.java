@@ -41,10 +41,24 @@ public class TodoServiceImpl implements TodoService {
         Todo existing = getTodoById(todo.getId(), userId);
 
         existing.setTitle(todo.getTitle() == null ? existing.getTitle() : todo.getTitle());
-        existing.setDescription(todo.getDescription());
-        existing.setPriority(todo.getPriority());
+        if (todo.getDescription() != null) { existing.setDescription(todo.getDescription()); }  // 仅非 null 才覆盖：原来无条件赋值，与同方法里 title 的 null 保护不一致
+        if (todo.getPriority() != null) { existing.setPriority(todo.getPriority()); }  // 仅非 null 才覆盖：原来无条件赋值，与同方法里 title 的 null 保护不一致
         if (todo.getCompleted() != null) {
+            if (todo.getCompleted() != null) {
             existing.setCompleted(todo.getCompleted());
+            /*
+             * 同步完成时间。
+             * 此前只改 completed、从不维护 completedTime：
+             *   1) 经 PUT 置为"已完成"的待办 completed_time 仍为 null，
+             *      而 getTodayTodos（以 completed_time >= 今天 判定今日成果）会漏掉它；
+             *   2) 由"已完成"改回"未完成"时会残留旧时间。
+             * 置为完成时若已有时间则保留原值（避免重复提交把时间刷新成"刚刚完成"），
+             * 置为未完成时清空。
+             */
+            existing.setCompletedTime(Boolean.TRUE.equals(todo.getCompleted())
+                    ? (existing.getCompletedTime() != null ? existing.getCompletedTime() : LocalDateTime.now())
+                    : null);
+        }
         }
         // userId / createTime 不允许被客户端覆盖
         existing.setUserId(userId);

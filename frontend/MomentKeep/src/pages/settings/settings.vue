@@ -58,7 +58,7 @@
       
       <!-- AI设置 -->
       <div class="setting-section">
-        <span class="section-title">AI设置（开发中，敬请期待）</span>
+        <span class="section-title">AI 设置（暂未开放）</span>
         
         <div class="setting-item">
           <span class="setting-label">AI自动填充提示词</span>
@@ -83,7 +83,7 @@
       
       <!-- 通知设置 -->
       <div class="setting-section">
-        <span class="section-title">通知设置（开发中，敬请期待）</span>
+        <span class="section-title">通知设置（暂未开放）</span>
         
         <div class="setting-item">
           <span class="setting-label">推送通知</span>
@@ -158,7 +158,7 @@
             <textarea 
               v-model="feedback.content" 
               class="input-box textarea-box" 
-              placeholder="请详细描述您的问题或建议..."
+              placeholder="说说遇到的问题或想法…"
             ></textarea>
           </view>
           <view class="form-item">
@@ -167,7 +167,7 @@
               type="text" 
               v-model="feedback.contact" 
               class="input-box" 
-              placeholder="邮箱或手机号，方便我们回复您" 
+              placeholder="邮箱或手机号，方便回复你" 
             />
           </view>
         </div>
@@ -239,7 +239,7 @@ const changeTheme = (index) => {
 
   if (!supportsDomTheme) {
     // 非 H5 端无法动态换肤：如实告知，避免"点了没反应却说已更新"
-    uni.showToast({ title: '主题偏好已保存，动态换肤仅在网页端生效', icon: 'none' })
+    uni.showToast({ title: '已保存，仅网页端即时生效', icon: 'none' })
     return
   }
 
@@ -253,7 +253,7 @@ const changeFontSize = (index) => {
   uni.setStorageSync('fontSizeIndex', index.toString())
 
   if (!supportsDomTheme) {
-    uni.showToast({ title: '字体偏好已保存，动态调整仅在网页端生效', icon: 'none' })
+    uni.showToast({ title: '已保存，仅网页端即时生效', icon: 'none' })
     return
   }
 
@@ -273,7 +273,6 @@ const chooseBackground = () => {
         filePath: res.tempFilePaths[0],
         name: 'file',
         header: {
-          'Authorization': `Bearer ${userStore.getToken}`
         },
         success: (uploadRes) => {
           try {
@@ -319,7 +318,6 @@ const resetBackground = async () => {
   if (userStore.getToken) {
     try {
       await del('/user/background', {}, {
-        'Authorization': `Bearer ${userStore.getToken}`
       })
     } catch (error) {
       console.error('清空背景图片失败:', error)
@@ -387,22 +385,22 @@ const applyBackgroundImage = (imageUrl) => {
 }
 
 const toggleAIAutoFill = (event) => {
-  aiAutoFill.value = event.target.checked
+  aiAutoFill.value = event.detail.value
   // 这里可以调用API保存AI设置
 }
 
 const toggleTodayNoPopup = (event) => {
-  todayNoPopup.value = event.target.checked
+  todayNoPopup.value = event.detail.value
   // 这里可以调用API保存设置
 }
 
 const toggleNotifications = (event) => {
-  notifications.value = event.target.checked
+  notifications.value = event.detail.value
   // 这里可以调用API保存通知设置
 }
 
 const toggleCheckinReminder = (event) => {
-  checkinReminder.value = event.target.checked
+  checkinReminder.value = event.detail.value
   // 这里可以调用API保存提醒设置
 }
 
@@ -444,7 +442,6 @@ const submitFeedback = async () => {
       content: fullContent,
       contact: feedback.contact
     }, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
     
     if (response.code === 200) {
@@ -495,14 +492,14 @@ onMounted(() => {
 .setting-section {
   background: rgba(242, 238, 232, 0.8);
   backdrop-filter: blur(10px);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .section-title {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
   margin-bottom: 16px;
@@ -517,15 +514,15 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .setting-item:hover {
   background-color: rgba(148, 167, 200, 0.1);
   padding-left: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .setting-item:last-child {
@@ -533,7 +530,7 @@ onMounted(() => {
 }
 
 .setting-label {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-color, #333333);
 }
 
@@ -544,7 +541,7 @@ onMounted(() => {
 }
 
 .setting-value span {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-muted, #999999);
 }
 
@@ -561,20 +558,20 @@ onMounted(() => {
   min-width: 100px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 8px;
+  transition: var(--transition-interactive);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   position: relative;
 }
 
 .theme-background:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
 }
 
 .theme-background.selected {
   border: 2px solid #C2977F;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   padding: 0;
 }
@@ -582,12 +579,12 @@ onMounted(() => {
 .theme-background img {
   width: 100%;
   height: 80px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-bottom: 8px;
 }
 
 .theme-name {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-secondary, #666666);
   display: block;
 }
@@ -595,13 +592,13 @@ onMounted(() => {
 /* 平台能力提示（非 H5 端的动态换肤说明） */
 .platform-hint {
   margin-top: 12px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   background-color: rgba(194, 151, 127, 0.1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .platform-hint span {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   line-height: 1.6;
   color: #8a7a6d;
 }
@@ -613,14 +610,14 @@ onMounted(() => {
 }
 
 .theme-btn {
-  padding: 6px 12px;
-  border: 1px solid var(--border-color, #D8C8BE);
-  border-radius: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, var(--border-color, #D8C8BE));
+  border-radius: var(--radius-lg);
   background-color: var(--surface-strong, #FFFFFF);
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-secondary, #666666);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .theme-btn.active {
@@ -636,14 +633,14 @@ onMounted(() => {
 }
 
 .font-btn {
-  padding: 6px 12px;
-  border: 1px solid var(--border-color, #D8C8BE);
-  border-radius: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, var(--border-color, #D8C8BE));
+  border-radius: var(--radius-lg);
   background-color: var(--surface-strong, #FFFFFF);
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-secondary, #666666);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .font-btn.active {
@@ -675,7 +672,7 @@ onMounted(() => {
   bottom: 0;
   background-color: #D8C8BE;
   transition: .4s;
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
 }
 
 .switch-slider:before {
@@ -687,7 +684,7 @@ onMounted(() => {
   bottom: 3px;
   background-color: var(--surface-strong, #FFFFFF);
   transition: .4s;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
 }
 
 input:checked + .switch-slider {
@@ -710,8 +707,8 @@ input:checked + .switch-slider:before {
 
 .arrow-icon::before {
   content: ">";
-  font-size: calc(20px * var(--font-scale, 1));
-  font-weight: bold;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold); /* 原为 bold(700)，归一为 600 */
 }
 
 /* 响应式设计 */
@@ -764,8 +761,8 @@ input:checked + .switch-slider:before {
 
 .modal-content {
   background-color: var(--surface-strong, #FFFFFF);
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   width: 90%;
   max-width: 400px;
   overflow: hidden;
@@ -782,13 +779,13 @@ input:checked + .switch-slider:before {
 
 .modal-header h3 {
   margin: 0;
-  font-size: calc(18px * var(--font-scale, 1));
+  font-size: var(--fs-lg);
   font-weight: 500;
   color: #333;
 }
 
 .close-icon {
-  font-size: calc(28px * var(--font-scale, 1));
+  font-size: var(--fs-3xl);
   color: #999;
   line-height: 1;
 }
@@ -803,7 +800,7 @@ input:checked + .switch-slider:before {
 
 .form-item .label {
   display: block;
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: #666;
   margin-bottom: 8px;
 }
@@ -816,12 +813,12 @@ input:checked + .switch-slider:before {
 
 .type-btn {
   padding: 8px 16px;
-  border: 1px solid var(--border-color, #D8C8BE);
-  border-radius: 20px;
-  font-size: calc(14px * var(--font-scale, 1));
+  border: 1px solid var(--border-color, var(--border-color, #D8C8BE));
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-body);
   color: #666;
   background-color: var(--surface-strong, #FFFFFF);
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .type-btn.active {
@@ -832,10 +829,10 @@ input:checked + .switch-slider:before {
 
 .input-box {
   width: 100%;
-  padding: 14px 12px;
-  border: 1px solid var(--border-color, #D8C8BE);
-  border-radius: 8px;
-  font-size: calc(14px * var(--font-scale, 1));
+  padding: 16px 12px;
+  border: 1px solid var(--border-color, var(--border-color, #D8C8BE));
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   color: #333;
   background-color: #fafafa;
   box-sizing: border-box;
@@ -862,20 +859,20 @@ input:checked + .switch-slider:before {
 }
 
 .cancel-btn {
-  padding: 10px 24px;
-  border: 1px solid var(--border-color, #D8C8BE);
-  border-radius: 8px;
+  padding: 12px 24px;
+  border: 1px solid var(--border-color, var(--border-color, #D8C8BE));
+  border-radius: var(--radius-sm);
   background-color: var(--surface-strong, #FFFFFF);
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: #666;
 }
 
 .confirm-btn {
-  padding: 10px 24px;
+  padding: 12px 24px;
   border: 1px solid #C2977F;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background-color: #C2977F;
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: #fff;
 }
 

@@ -41,6 +41,10 @@ export const THEMES = {
     '--border-color-light': '#E8E4DE',
     '--primary-color': '#C2977F',
     '--secondary-color': '#94A7C8',
+    // 危险/成功态此前直接用了 Material(#F44336/#4CAF50) 与 Ant(#ff4d4f) 的默认色，
+    // 与自有暖调撞色；这里换成同色系里降饱和的取值，三个设计体系不再混血。
+    '--danger-color': '#B5544A',
+    '--success-color': '#7C9A6D',
     '--sidebar-bg': '#F2EEE8',
     '--sidebar-border': 'rgba(0, 0, 0, 0.05)'
   },
@@ -56,6 +60,9 @@ export const THEMES = {
     '--border-color-light': '#3E3833',
     '--primary-color': '#D9B79B',
     '--secondary-color': '#8FA2BF',
+    // 深色下提亮一档，保证在深底上仍有足够对比
+    '--danger-color': '#E0857A',
+    '--success-color': '#9DBF8E',
     '--sidebar-bg': '#1E1A18',
     '--sidebar-border': 'rgba(255, 255, 255, 0.08)'
   },
@@ -71,6 +78,8 @@ export const THEMES = {
     '--border-color-light': '#E3D9CB',
     '--primary-color': '#A8846B',
     '--secondary-color': '#8A9BB0',
+    '--danger-color': '#A84E45',
+    '--success-color': '#6E8C60',
     '--sidebar-bg': '#E8E1D6',
     '--sidebar-border': 'rgba(0, 0, 0, 0.05)'
   }

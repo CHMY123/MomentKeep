@@ -69,7 +69,7 @@ public class TodoController {
 
     @PostMapping("/{id}/complete")
     @Operation(summary = "完成待办")
-    public Result<Todo> completeTodo(@PathVariable Long id, @RequestParam String completionNote) {
+    public Result<Todo> completeTodo(@PathVariable Long id, @RequestParam(required = false) String completionNote) {
         return Result.success(todoService.completeTodo(id, userService.getCurrentUserId(), completionNote));
     }
 }

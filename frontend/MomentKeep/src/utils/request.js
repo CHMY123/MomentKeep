@@ -147,6 +147,27 @@ export const request = async (options) => {
     timeout: options.timeout || DEFAULT_TIMEOUT
   }
 
+  /*
+   * AI 长请求单独放宽超时。
+   * 后端对 DeepSeek 的读超时是 60s，而本文件默认 15s —— 若沿用默认值，
+   * 前端会先 abort、提示"网络连接失败"，而后端可能已经成功调用并扣掉了
+   * 每日额度（客户端断开不会触发配额归还），用户既看不到回复又白耗一次额度。
+   * 这里按 URL 放宽到 90s，留出网络与模型生成的余量。
+   */
+  if (String(options.url || '').indexOf('/ai/chat') !== -1) {
+    const aiTimeout = 90000
+    if (!options.timeout || Number(options.timeout) < aiTimeout) {
+      options.timeout = aiTimeout
+    }
+    /*
+     * 注意：config 已在上面按 options.timeout 组装完毕，只改 options 不会生效，
+     * 必须一并覆盖已生成的配置对象——否则这段代码看着对、实际不起作用。
+     */
+    if (!config.timeout || Number(config.timeout) < aiTimeout) {
+      config.timeout = aiTimeout
+    }
+  }
+
   let response
   try {
     response = await uni.request(config)
@@ -159,7 +180,7 @@ export const request = async (options) => {
   const statusCode = response && response.statusCode
 
   // 登录态失效
-  if (statusCode === 401 || statusCode === 403) {
+  if (statusCode === 401) {
     handleUnauthorized()
     throw new Error('登录已过期，请重新登录')
   }

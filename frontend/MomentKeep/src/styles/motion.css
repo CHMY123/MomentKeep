@@ -1,0 +1,108 @@
+/**
+ * 入场动效层（全局，非 scoped）
+ *
+ * @description
+ * 本项目此前的动效只有"交互反馈"（hover / 按下），**没有入场编排**：
+ * 列表、卡片、记录都是同一瞬间全部出现，观感上是"啪"地铺满屏幕，
+ * 缺少视线引导，也看不出元素的先后关系。
+ *
+ * 这里只做一件事：让列表项按下标**错落淡入**（位移 10px + 透明度），
+ * 延迟按序号递增 30ms、最多叠到 8 项（第 9 项起与第 8 项同延迟）。
+ * 超出 8 项不再累加——否则长列表末尾要等两秒才出现，反而变慢。
+ *
+ * 【为什么用 backwards 而不是 both】
+ * both/forwards 会在动画结束后把 from 的关键帧值保留为最终样式，
+ * 而本动画的 from 含 transform。列表项里若有自带 transform 的元素
+ * （例如 .completed 的勾选位移动画），会被这份残留值永久覆盖。
+ * backwards 只在延迟期间套用起始状态，动画结束即交还给元素自身样式，
+ * 因此不会有任何"看不见的残留覆盖"。
+ *
+ * 【为什么可以放心用在 v-for 上】
+ * Vue 依赖稳定的 :key 复用 DOM，数据更新（例如勾选待办）只会修改已有节点，
+ * 不会重新挂载，所以动画只在**新节点真正插入时**播放一次，
+ * 不会出现"一勾选整个列表重播一遍"的闪烁。
+ */
+@keyframes mk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-item {
+  animation: mk-rise 0.36s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 30ms; }
+.stagger-item:nth-child(3) { animation-delay: 60ms; }
+.stagger-item:nth-child(4) { animation-delay: 90ms; }
+.stagger-item:nth-child(5) { animation-delay: 120ms; }
+.stagger-item:nth-child(6) { animation-delay: 150ms; }
+.stagger-item:nth-child(7) { animation-delay: 180ms; }
+.stagger-item:nth-child(n + 8) { animation-delay: 210ms; }
+
+/*
+ * 页面切换：整页淡入。
+ *
+ * 【为什么只做 opacity，不做位移】
+ * uni-page-body 是页面根容器，内部包含 position: fixed 的侧边栏与弹层。
+ * 一旦给祖先加 transform，它会成为这些固定定位元素的**包含块**，
+ * 固定元素会在动画期间跟偏移位（220ms 内可见跳动）。opacity 不会产生这种影响，
+ * 因此页面级过渡只做透明度，位移交给列表项各自承担。
+ * 小程序端没有 uni-page-body 标签，该规则不匹配，无副作用。
+ */
+@keyframes mk-page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+uni-page-body {
+  animation: mk-page-in 0.22s ease-out backwards;
+}
+
+/*
+ * 数值入场：统计数字在页面出现时轻微上浮。
+ *
+ * 说明：这里只能覆盖"进入页面时的首次出现"。数值变更（例如打卡后统计 +1）
+ * 不会重新挂载节点，CSS 动画不会重播——那需要在组件里监听数据并
+ * 手动触发类名切换（见文末待办），此处不假装实现了它。
+ * 选择器覆盖全项目现有的数值类，仍用 backwards，不与元素自身样式冲突。
+ */
+@keyframes mk-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-value,
+.time-number,
+.timer-time,
+.tech-value,
+.record-duration {
+  animation: mk-pop 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) 60ms backwards;
+}
+
+/*
+ * 尊重系统的"减少动态效果"偏好。
+ * 前庭功能敏感的用户在系统里开启该选项后，动效应当直接不播放；
+ * 小程序端不支持该媒体特性，查询不匹配，动画照常（可接受）。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .stagger-item {
+    animation: none;
+  }
+}

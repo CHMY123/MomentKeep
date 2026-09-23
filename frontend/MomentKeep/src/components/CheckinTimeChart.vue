@@ -31,7 +31,8 @@
         @touchend="onPointerOut"
       ></canvas>
       <view v-else class="chart-empty">
-        <text>暂无打卡数据</text>
+        <view class="empty-graphic-chart"></view>
+        <text>这段时间还没有打卡记录</text>
       </view>
     </view>
 
@@ -443,7 +444,28 @@ const normalizePointerEvent = event => {
   // #endif
 
   // #ifndef H5
-  // 小程序 / App：uni 的 canvas 事件本身已给出相对画布的 x/y，直接使用
+  /*
+   * 小程序 / App：统一走与 H5 相同的"事件里只给相对画布坐标"分支。
+   *
+   * 原因：uni 的 canvas 触摸事件同时带 clientX/clientY（视口坐标）和 x/y（画布坐标），
+   * 而 uCharts 的 getTouches 各版本对二者的取舍并不一致（有的还会乘一次 pixelRatio），
+   * 于是同一份事件在不同端算出的坐标不同——小程序端因此算出越界坐标、
+   * isInExactChartArea 判定失败，表现为"点节点完全没有反应"。
+   * 这里先用缓存的容器矩形把视口坐标换算成相对画布坐标，
+   * 且事件里只保留 x/y，让两端走同一段逻辑（H5 已验证可用）。
+   */
+  // 变量名带 mp 前缀：条件编译只是注释，lint 看不到平台差异，
+  // 与上面 H5 分支同名会报 "Cannot redeclare block-scoped variable"。
+  const mpClientX = typeof touch.clientX === 'number' ? touch.clientX : touch.pageX
+  const mpClientY = typeof touch.clientY === 'number' ? touch.clientY : touch.pageY
+  const rect = pointerRect.value
+  if (rect && typeof mpClientX === 'number' && typeof mpClientY === 'number') {
+    return {
+      changedTouches: [{ x: mpClientX - rect.left, y: mpClientY - rect.top }],
+      currentTarget: event.currentTarget || resolvePointerEl()
+    }
+  }
+  // 矩形还没测到（首帧极短窗口内）：退回 uni 给出的画布坐标，维持原有行为
   if (typeof touch.x === 'number' && typeof touch.y === 'number') {
     return { changedTouches: [touch], currentTarget: event.currentTarget || resolvePointerEl() }
   }
@@ -502,7 +524,41 @@ let windowResizeHandler = null
  * 绑定指针事件（仅 H5 需要，移动端由模板上的 touchstart/touchmove 覆盖）
  * @description 绑在图表容器上：既不会因内层 canvas 重建而丢失，又能收到冒泡上来的鼠标事件
  */
+/**
+ * 非 H5 端：图表容器在视口中的矩形，用于把触摸的视口坐标换算成"相对画布"坐标。
+ *
+ * @description 在这里缓存而不是每次触摸时现查——uni 的 boundingClientRect 是异步的，
+ * 而"定位数据点"必须同步返回，所以改为每次渲染后测量一次
+ * （bindPointer 由 renderChart 调用，尺寸变化 / 横竖屏切换都会重新走到这里）。
+ */
+/**
+ * 【必须用 ref，不能用普通的 let 变量】
+ *
+ * 这里最初写的是 `let pointerRect = null`，编译产物里也确有 `let ...=null`，
+ * 但开发版（dist/dev）运行时却抛 "pointerRect is not defined" ——
+ * 顶层可变绑定在这个位置没能稳定落地。改用 ref 后与同文件里其它状态
+ * （canvasStyleWidth 等）走完全相同的编译路径，不再有"声明丢失"的可能。
+ * 矩形本身是普通对象，放进 ref 不会有响应式开销问题（只在替换时触发）。
+ */
+const pointerRect = ref(null)
+
+const measurePointerRect = () => {
+  // #ifndef H5
+  if (typeof uni.createSelectorQuery !== 'function') return
+  uni
+    .createSelectorQuery()
+    .in(instance.proxy)
+    .select('.chart-wrap')
+    .boundingClientRect(rect => {
+      if (rect) pointerRect.value = rect
+    })
+    .exec()
+  // #endif
+}
+
 const bindPointer = () => {
+  // 先刷新矩形再判断是否需要绑定事件：即使事件已绑定，尺寸变化后矩形也必须是新的
+  measurePointerRect()
   if (pointerBound) return
   // #ifdef H5
   const el = resolvePointerEl()
@@ -589,8 +645,7 @@ watch(
   () => props.buckets,
   () => {
     renderChart()
-  },
-  { deep: true }
+  }
 )
 
 /** 供父组件在必要时手动触发重绘 */
@@ -609,7 +664,7 @@ defineExpose({
   display: flex;
   flex-wrap: wrap; /* 窄屏自动换行，不撑宽容器 */
   gap: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .legend-item {
@@ -620,7 +675,7 @@ defineExpose({
 .legend-dot {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   margin-right: 4px;
 }
 
@@ -630,7 +685,7 @@ defineExpose({
 
 .legend-dot-line {
   height: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-xs);
   background-color: #94a7c8;
 }
 
@@ -662,7 +717,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   line-height: 1.4;
-  font-size: calc(13px * var(--font-scale, 1));
+  font-size: var(--fs-sm);
   color: #aaaaaa;
 }
 
@@ -671,28 +726,28 @@ defineExpose({
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   min-height: 20px;
   margin-top: 8px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   background-color: var(--surface-strong, #FFFFFF)ff;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-sizing: border-box;
 }
 
 .tip-range {
-  font-size: calc(12px * var(--font-scale, 1));
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-normal); /* 正文应为 400；原 500 是把"标签的重量"用在了描述文字上 */
   color: #c2977f;
 }
 
 .tip-value {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: #555555;
 }
 
 .tip-hint {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-muted, #999999);
 }
 </style>

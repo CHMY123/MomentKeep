@@ -1,0 +1,119 @@
+/**
+ * 设计 token 层
+ *
+ * @description
+ * 在此之前，全项目的圆角/阴影/动效/字号都是"每处各写一遍"：
+ *   · border-radius 出现 10 种取值（4/6/8/12/14/16/20/22/24/50%），其中 12px 被复制 36 次
+ *   · 同一条卡片阴影 0 2px 8px rgba(0,0,0,.05) 被复制 30 次
+ *   · transition: all 出现 46 处（43 处都是 0.3s），尺寸、颜色、位移一律同速
+ *   · font-size 硬编码 224 处，12~32px 之间无比例关系
+ * 这不是"风格问题"，而是缺少一层设计变量：组件各自生成，于是同一种东西有多份写法。
+ * 本文件把这几类值收敛为唯一来源，供全局与各页面 scoped 样式引用。
+ *
+ * 【变量声明位置的两个注意点】
+ *
+ * 1) 主题相关变量（--surface-color / --text-color / --danger-color 等）刻意不在这里声明。
+ *    本选择器在 H5 会被编译为 `:root, uni-page-body`，而 uni-page-body 位于 <html> 与组件之间，
+ *    在此声明会遮蔽运行时（设置页换肤）写入的值——历史 bug 的根源。
+ *    它们只在使用处用兜底值引用：var(--text-color, #333333)。
+ *
+ * 2) 本文件里的变量可以安全声明在这里。
+ *    因为它们的值本身是 calc(...* var(--font-scale, 1))，自定义属性是"原样替换"，
+ *    其中的 --font-scale 会在【使用处】所属元素的继承链上求值，
+ *    所以即使本块被 uni-page-body 继承，字号缩放依然跟随运行时值。
+ */
+
+:root,
+page {
+  /* ---------- 圆角：4 个档次 + 胶囊 / 圆形 ---------- */
+  --radius-xs: 4px;      /* 小标签、小按钮 */
+  --radius-sm: 8px;      /* 次级容器、列表项 */
+  --radius-md: 12px;     /* 卡片（主力值） */
+  --radius-lg: 16px;     /* 大面板、模态框 */
+  --radius-pill: 999px;  /* 胶囊形（分段控件、标签） */
+  --radius-circle: 50%;  /* 头像、圆形按钮 */
+
+  /* ---------- 阴影：按层级分 4 档，不再是"一处一个值" ---------- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);   /* 贴地元素、列表项 */
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.05);   /* 卡片默认 */
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);   /* 悬浮、可点击的大卡片 */
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.15);  /* 模态框、抽屉 */
+
+  /* ---------- 动效 ---------- */
+  --duration-fast: 0.15s;
+  --duration-base: 0.25s;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  /**
+   * 交互态过渡。
+   * 取代原来的 `transition: all .3s`——all 会把布局属性（width/height/margin/inset）
+   * 一并纳入过渡，既造成无谓的重排，也让"什么在动"变得不可控。
+   * 这里只列出交互真正会变的 5 个属性。
+   */
+  --transition-interactive:
+    color var(--duration-base) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard);
+
+  /* ---------- 字号刻度（收敛来源；仍随 --font-scale 缩放） ----------
+   * 原来全项目出现 15 种取值（11/12/13/14/15/16/18/19/20/22/24/25/28/32/64），
+   * 其中 11/15/19/22/25 属于随手取整，已就近归入刻度（偏移 ≤2px，肉眼不可辨）。
+   */
+  --fs-xs: calc(12px * var(--font-scale, 1));
+  --fs-sm: calc(13px * var(--font-scale, 1));
+  --fs-body: calc(14px * var(--font-scale, 1));
+  --fs-md: calc(16px * var(--font-scale, 1));
+  --fs-lg: calc(18px * var(--font-scale, 1));
+  --fs-xl: calc(20px * var(--font-scale, 1));
+  --fs-2xl: calc(24px * var(--font-scale, 1));
+  --fs-3xl: calc(28px * var(--font-scale, 1));
+  --fs-4xl: calc(32px * var(--font-scale, 1));
+  --fs-display: calc(64px * var(--font-scale, 1)); /* 专注计时的大数字 */
+
+  /* ---------- 半透明描边 / 分隔线（原来散落着 rgba(0,0,0,.05/.1/.15)） ---------- */
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-soft: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --primary-soft: rgba(194, 151, 127, 0.12);
+  --secondary-soft: rgba(148, 167, 200, 0.12);
+
+  /* ---------- 间距刻度（4 的倍数） ----------
+   * 上一轮只收敛了圆角与字号，漏掉了间距：全项目的 padding/margin/gap 出现
+   * 5/6/10/14/15/18/22/26/30 这类"随手取整"的值，导致区块之间忽松忽紧。
+   * 这里给出刻度，并把非 4 倍数的取值就近吸附（偏差 ≤2px，肉眼不可辨），
+   * 使页面获得统一的呼吸节奏。
+   */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---------- 行高与字距（此前完全没有体系） ---------- */
+  --lh-tight: 1.25;  /* 标题 */
+  --lh-body: 1.5;    /* 正文 */
+  --lh-loose: 1.75;  /* 长文（协议 / 隐私政策） */
+  --ls-title: 0.02em; /* 中文标题略微松开更透气 */
+
+  /* ---------- 字重：三档，且只允许这三档 ----------
+   * 取证：全项目显式字重只有 500×51、600×24、bold×3，没有一处 400。
+   * 也就是说层级只有"半粗"和"粗"，正文级（400）从未被显式声明过；
+   * 而 UI 里超过一半的元素被写成 500，等于把"标签/按钮"的重量
+   * 施加到了普通描述文字上——所有文字看起来一样重，这就是"机器排版感"。
+   *
+   * 规则（新增元素请照此选档）：
+   *   normal(400) 段落、描述、提示、说明等一切"读"的正文
+   *   medium(500) 标签、按钮、Tab、次要标题等"操作/指代"元素
+   *   bold(600)   区块标题、数值、品牌名等唯一需要抢先被看到的元素
+   * 注意：bold 在浏览器是 700，比本项目最重的 600 还重，已全部归一为 600。
+   */
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold: 600;
+}

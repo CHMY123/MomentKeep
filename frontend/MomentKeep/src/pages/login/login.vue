@@ -6,7 +6,7 @@
         <image src="../../static/logo.png" class="logo" mode="aspectFit"></image>
         <view class="title-wrapper">
           <text class="app-name">朝暮记</text>
-          <text class="app-slogan">朝有目标，暮有记录</text>
+          <text class="app-slogan">打卡 · 待办 · 专注 · 倒计时</text>
         </view>
       </view>
 
@@ -54,7 +54,7 @@
 
       <!-- 登录按钮 -->
       <button class="login-btn" @click="handleLogin" :disabled="loading">
-        {{ loading ? '登录中...' : '登录' }}
+        {{ loading ? '登录中…' : '登录' }}
       </button>
 
       <!-- 注册链接 -->
@@ -73,11 +73,14 @@
  * @author MomentKeep Team
  * @since 2026-04-18
  */
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useUserStore } from '../../store/user'
 import { post } from '../../utils/request'
 
 const userStore = useUserStore()
+
+/** 「记住我」保存的账号名（只存账号，不存密码） */
+const REMEMBER_USERNAME_KEY = 'rememberedUsername'
 
 // 表单数据模型
 const formData = ref({
@@ -85,6 +88,45 @@ const formData = ref({
   password: '',
   remember: false,
   agreement: false
+})
+
+/*
+ * 进入页面时回填上次记住的账号。
+ *
+ * 原实现只"写"不"读"——勾选后把 token/userInfo 存了一遍（而 store 本来就会存），
+ * 却没有任何地方读取，用户下次打开面对的仍是空白输入框，
+ * 所以这个选项从观感上就是"设了等于没设"。
+ * 现在：记住的是**账号**，并在进入页面时回填 + 保持复选框勾选状态，
+ * 与用户对"记住我"的预期一致。密码不做本地保存（明文留存的风险高于便利）。
+ */
+onMounted(() => {
+  /*
+   * 已登录则直接进首页。
+   *
+   * 为什么这一步必不可少：登录页是 app.json 里的**首个页面**，应用启动一定先到它这里，
+   * 而此前这里没有任何"已登录就跳走"的判断 —— 即使 token 完好无损，
+   * 用户每次打开看到的仍是登录表单，于是"记住我"在观感上依旧是失效的。
+   * （严格说这也是原实现"形同虚设"的另一半原因：写进去了，却没人在启动时认这个状态。）
+   * 放在回填之前：已登录时无需再回填账号。
+   */
+  try {
+    if (userStore.token || userStore.isLoggedIn) {
+      uni.reLaunch({ url: '/pages/index/index' })
+      return
+    }
+  } catch (error) {
+    console.error('检查登录态失败:', error)
+  }
+
+  try {
+    const savedUsername = uni.getStorageSync(REMEMBER_USERNAME_KEY)
+    if (savedUsername) {
+      formData.value.username = savedUsername
+      formData.value.remember = true
+    }
+  } catch (error) {
+    console.error('回填记住的账号失败:', error)
+  }
 })
 
 // 加载状态
@@ -114,11 +156,37 @@ const handleLogin = async () => {
       userStore.setUser(user)
       userStore.setToken(token)
       
-      // 记住我功能
+      /*
+       * 「记住我」的语义修正
+       *
+       * 原实现的漏洞：store 的 setToken 会**无条件**把 token 写进本地存储，
+       * 这里随后又在勾选时重复写一遍 userInfo/token —— 也就是说勾与不勾，
+       * 登录态都被持久化了，这个复选框等于没有作用。
+       * 而且它保存的是 token 而非账号，用户下次打开仍要重新输用户名。
+       *
+       * 现在的语义：
+       *   勾选   → 持久化登录态 + 记住账号（下次进入自动回填并保持勾选）
+       *   不勾选 → 清掉持久化的登录态，只保留本次运行的内存态，
+       *            关闭应用后需重新登录（这才是"不记住"应有的行为）
+       * 密码不做本地保存：明文留存的风险高于便利收益。
+       */
       if (formData.value.remember) {
-        // 存储用户信息和token到本地存储
         uni.setStorageSync('userInfo', user)
         uni.setStorageSync('token', token)
+        uni.setStorageSync(REMEMBER_USERNAME_KEY, formData.value.username)
+        // 标记"允许自动登录"。键名 'rememberMe' 与 App.vue 的启动检查是同一约定，
+        // 两处必须一致（App.vue 里无法 import 本文件的常量，故用字面量并在两侧注明）。
+        uni.setStorageSync('rememberMe', '1')
+      } else {
+        /*
+         * 这里**不能**顺手删掉 token：
+         * utils/request.js 的 getToken() 是"每次请求都从本地存储读取"，
+         * 一旦删除，本次会话后续所有请求都会丢掉 Authorization 头、直接 401。
+         * 「不记住」的正确落点是"下次启动、任何请求之前"清掉持久化登录态
+         * （由 App.vue 完成），这样本次会话不受影响、下次打开才需要重新登录。
+         */
+        uni.removeStorageSync(REMEMBER_USERNAME_KEY)
+        uni.setStorageSync('rememberMe', '0')
       }
       
       uni.showToast({ title: '登录成功', icon: 'success' })
@@ -189,10 +257,10 @@ const handleAgreementChange = (e) => {
 
 /* 登录卡片 */
 .login-card {
-  background-color: #fff;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 40px 30px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 40px 32px;
   width: 100%;
   max-width: 400px;
 }
@@ -218,14 +286,14 @@ const handleAgreementChange = (e) => {
 }
 
 .app-name {
-  font-size: 28px;
+  font-size: var(--fs-3xl);
   font-weight: 600;
   color: #C2977F;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .app-slogan {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #999;
 }
 
@@ -235,7 +303,7 @@ const handleAgreementChange = (e) => {
 }
 
 .label {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #333;
   margin-bottom: 8px;
   display: block;
@@ -245,9 +313,9 @@ const handleAgreementChange = (e) => {
   width: 100%;
   height: 50px;
   border: 2px solid #E8E1D6;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0 16px;
-  font-size: 16px;
+  font-size: var(--fs-md);
   box-sizing: border-box;
 }
 
@@ -263,9 +331,9 @@ const handleAgreementChange = (e) => {
 }
 
 .checkbox-text {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #666;
-  margin-left: 6px;
+  margin-left: 8px;
 }
 
 /* 登录按钮 */
@@ -274,8 +342,8 @@ const handleAgreementChange = (e) => {
   height: 50px;
   background-color: #C2977F;
   color: #fff;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   font-weight: 500;
   margin-top: 24px;
   display: block;
@@ -293,13 +361,13 @@ const handleAgreementChange = (e) => {
 .register-row {
   text-align: center;
   margin-top: 20px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #666;
 }
 
 .link {
   color: #C2977F;
-  margin-left: 6px;
-  font-size: 12px;
+  margin-left: 8px;
+  font-size: var(--fs-xs);
 }
 </style>

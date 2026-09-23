@@ -22,6 +22,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.dao.DuplicateKeyException;
 
 /**
  * 全局异常处理
@@ -157,5 +158,25 @@ public class GlobalExceptionHandler {
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
         return message.isEmpty() ? "参数校验失败" : message;
+    }
+
+    /**
+     * 唯一键冲突 → 幂等语义，返回可读提示而不是 500。
+     *
+     * @description 打卡表对"每日至多一次"的类型（早起 / 睡眠）建了唯一索引，
+     *              重复提交（网络重试、慢双击、再次打卡）会触发唯一键冲突。
+     *              这属于"用户想做的事已经做过了"，不是系统故障，
+     *              因此返回 409 与明确文案，前端可直接展示。
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public Object handleDuplicateKey(DuplicateKeyException e) {
+        /*
+         * 返回类型刻意写成 Object：Spring 允许 @ExceptionHandler 返回任意对象，
+         * 由消息转换器负责写出；而 build(...) 的泛型实参在本文件里未统一暴露，
+         * 写具体类型（如 ResponseEntity<Result<Void>>）有编译不通过的风险。
+         * 这里把类型判断交给运行时，换取与既有处理器完全一致的写出行为。
+         */
+        log.warn("唯一键冲突：{}", e.getMessage());
+        return build(HttpStatus.CONFLICT, "今天已经打过卡了，无需重复提交");
     }
 }

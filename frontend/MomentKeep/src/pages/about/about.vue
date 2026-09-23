@@ -63,7 +63,19 @@
         <div class="developer-list">
           <div class="developer-item">
             <div class="developer-avatar">
-              <img src="https://momentkeep.s3.bitiful.net/avatars/developer.jpg" alt="赖文韬" @error="handleImageError" />
+              <!--
+                这里必须用 uni-app 的 <image> + mode，而不是原生 <img> + object-fit。
+                小程序端 <image> 的裁剪由 mode 属性决定，默认 scaleToFill 会把非正方形图片
+                直接拉伸变形（贡献者头像此前就是这样被拉长的）；而 CSS 的 object-fit
+                对小程序 <image> 的内层不起作用，只有 mode 说了算。
+                mode="aspectFill" = 等比铺满并裁掉溢出部分，等价于 object-fit: cover。
+              -->
+              <image
+                class="developer-avatar-img"
+                src="https://momentkeep.s3.bitiful.net/avatars/developer.jpg"
+                mode="aspectFill"
+                @error="handleImageError"
+              />
             </div>
             <div class="developer-info">
               <span class="developer-name">赖文韬</span>
@@ -156,10 +168,10 @@ onMounted(() => {
 /* 项目信息 */
 .about-section {
   background-color: var(--surface-color, #F2EEE8);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
   text-align: center;
 }
 
@@ -174,7 +186,7 @@ onMounted(() => {
 }
 
 .app-name {
-  font-size: calc(24px * var(--font-scale, 1));
+  font-size: var(--fs-2xl);
   font-weight: 600;
   color: #C2977F;
   display: block;
@@ -182,7 +194,7 @@ onMounted(() => {
 }
 
 .app-slogan {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
   display: block;
 }
@@ -193,7 +205,7 @@ onMounted(() => {
 }
 
 .info-title {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
   margin-bottom: 12px;
@@ -202,7 +214,7 @@ onMounted(() => {
 }
 
 .info-content {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
   line-height: 1.6;
 }
@@ -212,7 +224,7 @@ onMounted(() => {
 }
 
 .feature-title {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
   margin-bottom: 16px;
@@ -231,13 +243,13 @@ onMounted(() => {
   align-items: center;
   padding: 12px;
   background-color: var(--surface-strong, #FFFFFF);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 .feature-icon {
   margin-right: 12px;
-  font-size: calc(24px * var(--font-scale, 1));
+  font-size: var(--fs-2xl);
   width: 24px;
   height: 24px;
   display: flex;
@@ -261,21 +273,21 @@ onMounted(() => {
 }
 
 .feature-text {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-color, #333333);
 }
 
 /* 开发者信息 */
 .developer-section {
   background-color: var(--surface-color, #F2EEE8);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .section-title {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
   margin-bottom: 16px;
@@ -294,17 +306,17 @@ onMounted(() => {
   align-items: center;
   padding: 12px;
   background-color: var(--surface-strong, #FFFFFF);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 .developer-avatar {
   width: 60px;
   height: 60px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   overflow: hidden;
   margin-right: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-xl);
   background-color: var(--bg-color, #F8F6F2);
   display: flex;
   align-items: center;
@@ -312,10 +324,18 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.developer-avatar img {
+.developer-avatar img,
+.developer-avatar .developer-avatar-img {
   width: 100%;
   height: 100%;
+  /*
+   * 两端各需一种裁剪方式，缺一不可：
+   *   H5   —— 由内层 img 的 object-fit: cover 裁剪；
+   *   小程序 —— 由 <image mode="aspectFill"> 裁剪，object-fit 在那里对内层无效，
+   *             只写 object-fit 就会被默认的 scaleToFill 拉伸变形。
+   */
   object-fit: cover;
+  display: block;
 }
 
 .developer-avatar .default-avatar {
@@ -326,7 +346,7 @@ onMounted(() => {
   justify-content: center;
   background: linear-gradient(135deg, #C2977F 0%, #94A7C8 100%);
   color: white;
-  font-size: calc(24px * var(--font-scale, 1));
+  font-size: var(--fs-2xl);
   font-weight: 600;
 }
 
@@ -335,7 +355,7 @@ onMounted(() => {
 }
 
 .developer-name {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
   display: block;
@@ -343,17 +363,17 @@ onMounted(() => {
 }
 
 .developer-role {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
 }
 
 /* 技术栈 */
 .tech-section {
   background-color: var(--surface-color, #F2EEE8);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .tech-list {
@@ -365,19 +385,19 @@ onMounted(() => {
 .tech-item {
   padding: 12px;
   background-color: var(--surface-strong, #FFFFFF);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
 .tech-name {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
   display: block;
   margin-bottom: 4px;
 }
 
 .tech-value {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color, #333333);
 }
@@ -387,19 +407,19 @@ onMounted(() => {
   text-align: center;
   padding: 20px;
   background-color: var(--surface-color, #F2EEE8);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 
 .copyright {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-secondary, #666666);
   display: block;
   margin-bottom: 8px;
 }
 
 .version {
-  font-size: calc(12px * var(--font-scale, 1));
+  font-size: var(--fs-xs);
   color: var(--text-muted, #999999);
 }
 
@@ -431,8 +451,8 @@ onMounted(() => {
   margin-bottom: 20px;
   padding: 16px;
   background-color: var(--surface-color, #F2EEE8);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 
 .legal-list {
@@ -444,7 +464,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 0;
-  border-bottom: 1px solid var(--border-color-light, #E8E4DE);
+  border-bottom: 1px solid var(--border-color-light, var(--border-color-light, #E8E4DE));
 }
 
 .legal-item:last-child {
@@ -452,12 +472,12 @@ onMounted(() => {
 }
 
 .legal-name {
-  font-size: calc(14px * var(--font-scale, 1));
+  font-size: var(--fs-body);
   color: var(--text-color, #333333);
 }
 
 .legal-arrow {
-  font-size: calc(16px * var(--font-scale, 1));
+  font-size: var(--fs-md);
   color: #bbbbbb;
 }
 </style>

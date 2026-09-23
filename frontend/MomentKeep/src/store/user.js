@@ -6,6 +6,7 @@
  */
 import { defineStore } from 'pinia'
 import { useCache } from '../utils/cache'
+import { buildUrl, getToken } from '../utils/request'
 
 /**
  * 用户状态管理Store
@@ -100,6 +101,27 @@ export const useUserStore = defineStore('user', {
      * @description 清除用户状态和本地存储的登录信息
      */
     logout() {
+
+    /*
+     * 尽力而为地通知后端作废令牌：/user/logout 会让 token_version 自增，
+     * 使已签发的 JWT 立即失效。此前这里只清本地存储、从不调用该接口，
+     * 于是"退出登录"后旧令牌在服务端仍然有效直到过期，其他设备也不会被踢下线。
+     * 刻意不 await、失败也不提示：本地登出必须成功（用户意图优先），
+     * 网络不可用时最坏退化为原来的行为。
+     */
+    try {
+      const logoutToken = getToken()
+      if (logoutToken) {
+        uni.request({
+          url: buildUrl('/user/logout'),
+          method: 'POST',
+          header: { Authorization: 'Bearer ' + logoutToken }
+        })
+      }
+    } catch (e) {
+      console.error('通知后端登出失败（已忽略，本地登出继续）:', e)
+    }
+
       this.userInfo = {
         id: '',
         username: '',

@@ -31,6 +31,17 @@ public interface CheckinService {
      * 删除打卡记录
      */
     void deleteCheckin(Long userId, String type, LocalDate date);
+
+    /**
+     * 删除打卡记录（记录级）
+     *
+     * @param time 目标记录的时间（可空）。
+     *             为空时保持原语义：删除该类型当天的全部记录；
+     *             非空时只删除与该时间匹配的那一条。
+     *             前端"取消单条用餐 / 运动"必须传它，
+     *             否则会把同类型的其它记录一并删掉（数据静默丢失）。
+     */
+    void deleteCheckin(Long userId, String type, LocalDate date, String time);
     
     /**
      * 获取打卡时间分布

@@ -6,7 +6,7 @@
         <view class="user-info-header">
           <view class="avatar-section">
             <view class="avatar" @click="uploadAvatar">
-              <image :src="userInfo.avatar || 'https://img.icons8.com/ios-filled/50/000000/user.png'" alt="avatar" />
+              <image :src="userInfo.avatar || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAADu0lEQVR4AexYS0hUYRQ+5zcXFWREr03vqKgoKrKIolU5Cq0Cm2lROQZGtC2hgqQHVIs20cLKaxQ51xa1EJ0ZFawgLFDoQQ+zVesiWvRQ857+MyWKzP+4c68vmMs9zPF833l8/z/3Xu8ImOJHXsBEb2B+B/I7EHAF8l+hgAsYOD30HUi7daUp13FSCedZyq37mjH2E05dWmKBJx5VIDQBXbW1hUm37ioBNsseFYCwAwDnZIx9hDhjUthl5kJIRygCWtw7K74UFXYi4Ek5F0pTnSiFVTOXc1QkP/FQBAjyLsmmW6TZnlsQPBZry1fyAgtIurejclUPKDsoAASoCuOaCCwASBxTzGgMe4TVRpKBEEgA1dQIufrFhh5qGKE4U0PNMCLCyNAQ2tYu2SC/CtM1FC3Eua2rlqzSkgxgIAHeoLfdUN8IexisRjABKF4aJzQQCMUHA0ULCy1qAAdn9r8mIs9AU8JE5M0WM18pCRZAIAH79lX9lBdxr0Wf7BSE3h3l5b+yg3bRQAK4BZI4z5+5mCA8l0veyBwfAkamDfuRWEUDEFwZjlh6MqckFm+0ZCtpgQVw5ZKez6cB6Cn7dkbJfzl2bB0rFAFYU+NFopW7BdFWAnijakhEXQUCN0huGeeoeH7ioQgYarg3VtkVOVCx0ROwTj6kqoDoHlvG98T6SDRevKe8QilwqI6fz1AFcGNEpLLy+LuSaPxmJFZ5iC3jHzzyljHmhGmhCwhzOJtaeQHZVqnjUf1sfuNKJ5xtbOxzLBs3aCyUHUi5zuZUor5avsC3JBPO974++ibA+0QIz9nY5xhjSddpTjU6pzgn6PCcn7OA9oZbC5KNztlUwnkvC3UD0mUALEWEWaA4GJN3pLL/D75uzk27zpn0w7vzFSnGsG8B/AIiV+/EHyF6kOCC/F9ojbGLioCwRj43LlL/wMekW3+ca6uoqrgvAR0NtXNTqxc9kcWuA2ARhHZgEQLdSK9e/LjlgTPPT1lrAekHt5b9xsIXiLjTTwNfXIRd6EFn+31nuW2elYCmptoZnlfQhgjWhW0HGM2T18iKgQJo5Z6jsWx/WwmY9qPwGhfOVmAsYtyLe9rUNgpoSdzeJAtW2RQLk8M9ubepplGAQHHYVGSscAHC+IOZUYC8Z8fGakBjXaT9Jo5WQDJRv1Te53N+yJiam3FcmZlBQ9QKkHlLpU30qZ3BIMDTJo+LMhxcqOujFVAaq7wj36LQt0XjoeWURo+6OQvQJU4WTLsDk2VI3Rx5AbrVGQ9syu/AXwAAAP//8SRC4gAAAAZJREFUAwAgDj1wJiPQ2AAAAABJRU5ErkJggg=='" alt="avatar" />
               <view class="avatar-edit">
                 <view class="icon-camera"></view>
               </view>
@@ -73,7 +73,7 @@
             <view class="dialog-close" @click="closeDeleteDialog">×</view>
           </view>
           <view class="dialog-body">
-            <text>您确定要注销账户吗？注销后所有数据将被删除，且无法恢复。</text>
+            <text>注销后所有数据会被删除且无法恢复。</text>
           </view>
           <view class="dialog-footer">
             <button class="dialog-btn cancel-btn" @click="closeDeleteDialog">取消</button>
@@ -167,7 +167,6 @@ const uploadAvatar = () => {
         filePath: tempFilePaths[0],
         name: 'file',
         header: {
-          'Authorization': `Bearer ${userStore.getToken}`
         },
         success: (uploadRes) => {
           try {
@@ -185,7 +184,7 @@ const uploadAvatar = () => {
           }
         },
         fail: () => {
-          uni.showToast({ title: error.message || '网络错误，头像上传失败', icon: 'none' })
+          uni.showToast({ title: '上传失败，请重试' || '网络错误，头像上传失败', icon: 'none' })
         }
       })
     }
@@ -199,7 +198,6 @@ const updateProfile = async () => {
       email: formData.email,
       phone: formData.phone
     }, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -229,7 +227,6 @@ const confirmDeleteAccount = async () => {
     // 后端 DeleteAccountDTO 的 confirmation 是必填（@NotNull）用于防误触，
     // 此前前端发了空对象，导致注销接口一律返回 400
     const response = await post('/user/delete', { confirmation: true }, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -285,7 +282,6 @@ const changePassword = async () => {
       newPassword: passwordData.newPassword,
       confirmPassword: passwordData.confirmPassword
     }, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -338,11 +334,11 @@ onMounted(() => {
 /* 用户信息卡片 */
 .user-card {
   background-color: var(--bg-color);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--sidebar-border, var(--border-subtle));
 }
 
 .user-info-header {
@@ -365,24 +361,24 @@ onMounted(() => {
 .avatar {
   width: 100px;
   height: 100px;
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   overflow: hidden;
   position: relative;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow-lg);
+  transition: var(--transition-interactive);
 }
 
 .avatar:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-xl);
 }
 
 .avatar image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .avatar:hover image {
@@ -396,12 +392,12 @@ onMounted(() => {
   width: 32px;
   height: 32px;
   background-color: var(--primary-color);
-  border-radius: 50%;
+  border-radius: var(--radius-circle);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow-xl);
+  transition: var(--transition-interactive);
 }
 
 .avatar:hover .avatar-edit {
@@ -414,7 +410,7 @@ onMounted(() => {
   width: 14px;
   height: 14px;
   display: inline-block;
-  background-image: url(https://img.icons8.com/ios-filled/50/ffffff/camera.png);
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAADzUlEQVR4AexX20sUYRT/nXHcjDKol6yHcrvbhXrrodvGWup2RSqoKCoqMyGIoof+ha5UCFGRSJldoJfcMrK2FKKHwC5QDxV0g1JaoTIydb6+s4Is+s1tZ9xF2GGOc+b3/c75nd98M8JqGOZH1kCmNzC7A9kd8PgEsq+QxwfoudzXHYiEF5dGipcJy5Acz1MnNfDNQFnZtBEg7WRSb3UqOQmuetU16psB0T3xIEBFsD2oqI9rS3RE8MVAcfGiSZrAUUeKksRcrpGp59OVgZWh0KzS4sWhgaGLnCOC8F5AtAonIblcM7AP37OGG1e2BsLhhePlR1kXCS/9qevijYacR4OCqIpAC8hFaLJmUB/ZmzVYizVZ286MpYFIeNmKEch7IZtsBlG+vKbn7NPazNo8g5WoqYFIKFQAEtdBGG/VYEjXpLYgUV+yZMkEMx1TA0I3agAaiwwf8rUcpwW0S2ZjKA2UhkKFsrDErCjdOBHKeCaVrtKAltMzS0V2gxERJhcGE0FEbkqVXLOZlAYM0hYouzgAp02fgeOnz+F2QyOqL1xOBOfHTp3FjJmpPxdBpCzWVDNpAh0q3A5bX74RJ85Uo2jOXOTmBvrpnM+eOw9sYs368n7cTSIE/VHxlQZURMAaXVe+AXsqq6DruilRz83FvqoDKFu91pTjdsEXA5ODQezaXeFYe3dFJQomTHTMtyL6YqCkdBX46VoJJa/l5Y3E2hRfpeQ+nPtiYN589998KjU88MDwbGDUqNEITpk6sK/tfWFwCvLzx9jy7AieDQQCARC5/z+vaRqsPng4PDwb6OiIg8OhXj+Nazj6gRQTzwZY98P7d3xxFanUqAR8MXCzvg6GYaj6KzHm3qi7olxzC/pi4NWLVtRfrXWsXXv5Il6/eumYb0X0xQALXK2twZmTx9DZ+ZtvlcFrZ08dB++YkpAC6JsB1m6824CKXdtx+9YNfP3ymaFEcM4Yr92L3klgfv0xMWB8TFWgIx7HxfPV2LtzG3Zs3ZQIzhnjtVT7ajA+qWrVBnr1VhXZLdbe1gYOt3WD+cIQ/+j5YBxQGojGYt+EkL+HVRUZwITAzbvNze0qaaUBJhp6935Z+IPzTIaAiGtdRqXZDKYGGhufxkkYh80K04WTIQ41tLSY/sAyNcADRh8213SJvwUyvwYhfslres4+rWuszTNYiVoa4MKmpmffow8eb4k2PRnT00NFBnqXD2WwBmuxJmvzDFZhayC5+H4s9vbeg5bYUAZrJGva5a4M2DXLxPrQGEijk6yBND5spVR2B5SPJY3gsN+B/wAAAP//FvMKTgAAAAZJREFUAwDwJMZwwuWSAQAAAABJRU5ErkJggg==);
   background-size: contain;
   background-repeat: no-repeat;
 }
@@ -424,11 +420,11 @@ onMounted(() => {
   background-color: #C2977F;
   color: white;
   border: none;
-  border-radius: 20px;
-  font-size: 14px;
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-body);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .edit-profile-btn:hover {
@@ -447,9 +443,9 @@ onMounted(() => {
 .info-item {
   background-color: rgba(0, 0, 0, 0.02);
   padding: 20px;
-  border-radius: 12px;
-  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
-  transition: all 0.3s ease;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sidebar-border, var(--border-subtle));
+  transition: var(--transition-interactive);
   display: flex;
   flex-direction: column;
   min-height: 100px;
@@ -459,19 +455,19 @@ onMounted(() => {
 .info-item:hover {
   background-color: rgba(0, 0, 0, 0.04);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .info-label {
-  font-size: 14px;
-  color: #999999;
+  font-size: var(--fs-body);
+  color: var(--text-muted, #999999);
   margin-bottom: 8px;
   display: block;
   font-weight: 500;
 }
 
 .info-value {
-  font-size: 18px;
+  font-size: var(--fs-lg);
   color: var(--text-color);
   font-weight: 600;
   line-height: 1.5;
@@ -481,14 +477,14 @@ onMounted(() => {
   width: 100%;
   padding: 16px;
   border: 2px solid var(--primary-color);
-  border-radius: 8px;
-  background-color: white;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: var(--fs-md);
   color: var(--text-color);
   font-weight: 500;
   margin-top: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-interactive);
   pointer-events: auto;
   cursor: text;
   box-sizing: border-box;
@@ -506,15 +502,15 @@ onMounted(() => {
 /* 通用卡片样式 */
 .form-card {
   background-color: var(--bg-color);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--sidebar-border, var(--border-subtle));
 }
 
 .form-title {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color);
   margin-bottom: 16px;
@@ -529,18 +525,18 @@ onMounted(() => {
 
 .form-label {
   display: block;
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--fs-body);
+  color: var(--text-secondary, #666666);
   margin-bottom: 8px;
 }
 
 input, textarea {
   width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #D8C8BE;
-  border-radius: 8px;
-  background-color: white;
-  font-size: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: var(--fs-body);
   color: var(--text-color);
   box-sizing: border-box;
   line-height: 1.6;
@@ -556,11 +552,11 @@ textarea {
 /* uni-app 输入框样式 */
 .input-box {
   width: 100%;
-  padding: 14px 16px;
+  padding: 16px 16px;
   border: 2px solid #E8E1D6;
-  border-radius: 8px;
-  background-color: white;
-  font-size: 18px;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: var(--fs-lg);
   color: var(--text-color);
   box-sizing: border-box;
 }
@@ -571,11 +567,11 @@ textarea {
 
 .textarea-box {
   width: 100%;
-  padding: 14px 16px;
+  padding: 16px 16px;
   border: 2px solid #E8E1D6;
-  border-radius: 8px;
-  background-color: white;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: var(--fs-md);
   color: var(--text-color);
   box-sizing: border-box;
   min-height: 120px;
@@ -592,11 +588,11 @@ textarea {
   background-color: #C2977F;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
   font-weight: 500;
   margin-top: 8px;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
   cursor: pointer;
 }
 
@@ -606,21 +602,21 @@ textarea {
 
 /* 联系方式显示 */
 .contact-info {
-  padding: 10px 14px;
+  padding: 12px 16px;
   background-color: rgba(0, 0, 0, 0.02);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   color: var(--text-color);
-  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
+  border: 1px solid var(--sidebar-border, var(--border-subtle));
 }
 
 /* 账户操作 */
 .action-card {
   background-color: var(--bg-color);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--sidebar-border, var(--border-subtle));
 }
 
 .action-item {
@@ -628,8 +624,8 @@ textarea {
   align-items: center;
   padding: 12px 0;
   cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 8px;
+  transition: var(--transition-interactive);
+  border-radius: var(--radius-sm);
   margin-bottom: 8px;
 }
 
@@ -641,7 +637,7 @@ textarea {
 
 .icon-lock {
   margin-right: 12px;
-  font-size: 20px;
+  font-size: var(--fs-xl);
   color: var(--primary-color);
   display: flex;
   align-items: center;
@@ -655,15 +651,15 @@ textarea {
   width: 20px;
   height: 20px;
   display: inline-block;
-  background-image: url(https://img.icons8.com/ios-filled/50/000000/lock--v1.png);
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAEjUlEQVR4AexYXWgcVRT+zmyyaWzxr9WGgj+IDxoEsbWiqdldshuaXVvtS0ERxBdFEWurYLGtaasGFVT64IMVkWDx702U7KrJhs02CSIGBRV9MA/+lfRFkDalTXbn9NxpH2ZmJzt3Zme3P+Tmnsw959x7vvPNnbl75xq4xMsygQs9gcszcFnNQDp9z+qBdOLJbDr5aS6T/DmbSfyvxGqLLZtJPrF5833XRkk6kkdo+3bEsunEC3HqnDWIDhPhYUnyDgJdqcRqi42A92OV+GwunXhObJFgNxwk29t73fx/iTIRvSUJXiWJ1a+Eq0F0KJtJjKuxaLA0RGDrhg1XUIdRloR6guZBoCTFjdFUKtUWdKy9f0MEqtes+kCC3Sbiqmwy849gPmwJ8BPAJtyFcGdnjAfd5iB6aALZ/t6kAD0i4qgM/maRqjcUiuX1+WL5KUvGJu6CWblFSIw4OotCxHsH0smN0gxVQxOASe/UIDL2FMbKA6OjU8fcvvz49J/5sfIWIfGy00fy3vNOp01fC0Wgv3/TOnlp1ztgmKfzxYk3HDYPRUgMySxNuVwpl66thiLQXjVytQjmq2JjEb/KxKaDqLzQ63J9PTf5DfTyhyIAg1xgbJ6qtk16AXjZ2k7zhDxKjpfapFivV18/WygCcpvX2AOL/mupVDppt9Vrfzk1dYKZfrP3kVm4267rtkMRACgGWyHGgk3VbPIZV8dOl66lhiSgFbslnZYJtOQ21wEJMwME5g5nTF6TyyQOBBFZhZwLAVNcYpJIoBqAAJDtS/TJtvkXQXhMxFYNWVZpPxBEjBthK7KleFzFfqAvEWhjqEUgl0p1yd39XH70i0TUfe42ye8pywIqFbD+2dLRacp4GSebPplQ1Z9kU0vdJmEym0l+qDCV1U+0CJix6vUSaJvIuUokV1KAAAGwdAQqRATrT10JkAtUIVXAj1apslbpfqJFgEDPA9YzitYU+VIwjF06WLoEQm+2dJLw6iM3TQvTl8BAKnUzCPKSesE00SaYFrYPhC8Box2O5c4nnuXuWLECWx7chj2DBy3JbX0I8bhaJS239r8YVVb7dfYl4BfAy//iS/vw9LM7sUk+2pQ8s2MXdu8d9OrasC1yAitXrsK9PffXJKZsylfjaNAQOYG1XV1LplTPt+QgH0fkBI7PzS0JWc+35CAfR+QE5udPYuaH72tgv5uehPLVOBo0RE5A5fPa/n1499Db+OTIsCWq/ebQK8oVuTSFwMLCAgojX+Hjj4YtUW1lizx7CdgUAhK3ZdWfwCL+aVk2LiDmtn9dphrVl0C+VJoD43jNyGYbBNPC9sHxJaDGy859WF1bKsTv6eBpEWg/XR2Sj5a/dAJG0Udu2N/cfux1nVhaBNRBlJyX79YJGEkf5h2Fwh/ucyPP0FoE1Mivi0c/Y3PxVvn+m1F6U4R5RmEUike/0I2vTUAFLIxPz8p5/8ZKhW6HCfmw54PyaNUKAtolFoG7VWyFobB0JRCB80H521Lp9/z4xBE5Kj8QiUiskbGyOisNfDoQhsB5HhfHZZnAhZ6HS34GzgIAAP//bUazJAAAAAZJREFUAwCX06hwL+F+xwAAAABJRU5ErkJggg==);
   background-size: contain;
   background-repeat: no-repeat;
 }
 
 .icon-close-circle {
   margin-right: 12px;
-  font-size: 20px;
-  color: #ff4d4f;
+  font-size: var(--fs-xl);
+  color: var(--danger-color, #B5544A);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -676,15 +672,15 @@ textarea {
   width: 20px;
   height: 20px;
   display: inline-block;
-  background-image: url(https://img.icons8.com/ios-filled/50/ff4d4f/close-window.png);
+  background-image: url(data:image/png;base64,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);
   background-size: contain;
   background-repeat: no-repeat;
 }
 
 .icon-logout {
   margin-right: 12px;
-  font-size: 20px;
-  color: #ff4d4f;
+  font-size: var(--fs-xl);
+  color: var(--danger-color, #B5544A);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -697,18 +693,18 @@ textarea {
   width: 20px;
   height: 20px;
   display: inline-block;
-  background-image: url(https://img.icons8.com/ios-filled/50/ff4d4f/logout-rounded-left.png);
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAD4klEQVR4AeyWX2wMXRTAz7lbJV+/fJ/I9wlvHjRBoiEl8dDdnaZVVS+80AQvSLQlIuJf/Ouo+FPCg9ASDxIkEg8kHlqlm253JUU0/jwg4YEnfyNFKa29x5mKmN2dO53pdNeQvZkzc++555x7fvfembkCfvOSA/jVC5hbgdwKeJwBV1tonqZNriwv0VQyPxj832M+rt2HBCguLh5VVR7aUVUWfh7Io8cCAh0qwdHiVVV5+GFlWbDadSbDdLAFWFAemjp+bMFNANwDCBPAWZkiUJyfXxY+r2naWGcuw7eyBZAE9Yg4czjhEaF6TJ6sGY6vGx8lQGVZeDYiLnETLNWWg++uqCgqSNWPZJvHsA4nSBZb97jRYn5AjpvuxsOtrRIAEGe4DWZljzIxInGsYhs6JQABIIxAkYhyBMIoQygBlB4+6/ANQMdx/e94k74h1lR/KdakLyNytgN8AyBQHiCkw5z2QkA6G2+uP+JksX0DwC/c4qSEEdbHmnfVJuksGr4BAMTTafkRHrt+YtfcNL1J4RuA/AHcS0CPTbkBIIiEBOOdKAJF8Q3AnHX6+3wQFQTwxpwrnwYKGKyNX3LLs5gLAHNY9/XbJ7f8G2vaGY4365pKvgJMAsRGSCnIB8kAUtu9MxvTjiVZAeAvyv5PiTFvAUWUZ7PDTpDoUEr+35sIRT29BRe/N37eMw6QJ4QgotWA4HksRKiIndCngal4DmqKZVlF4EM5Im9ty27PyowDDEjgBaBTQOD5TMR/58uhGv2BmTrjAMZg4bqGrX8FPo8DkhoCltoJ229hSb8I7kvCpakdWQEwBp21uvFdqG5PZ7BWj6okD+Ap77VNhr1ZeOZfJAjnla7Re816o541AGMwO7lxVP+nH+RVBPjPbMf77yPCYPIvzPofdd8A9I+i7Zxo4Y/EBp/83gQELArV6fcH2xY33wBwbqtYki+ktSU1DdeSlckt/wAQXEhKjeBIqLahOUln0fANgBjdtxmITrN08r5vDNbu3miRb5rKNwAlKw9+CNU1rGDRwvzZReQ/R1q66QrfAKSn5kzz5wLwqfCOszmwt0IUyk+gvaezXuUKkAjcdRbCxoqor+fjl3s2Fp67lACt7dFb/FuPehmB/Y92dXX1eYkxlK8SgB1lP32u5m/BM667v4hirZHYNveO7jzsACASufnyZU9vIZHcxyCWZxGL4R5JkstbIrEw90mWjF62AMbI3d3dA62R+PaWSOfExFcslJAoVQl9keNb2junXonEzxm+2ZAhAcxJtEWjT660X4+qpDUefz1on8WbK4As5uV4qByA46nKkGFuBTI0sY7DfgMAAP//RUw+hwAAAAZJREFUAwDPwHBwdtkLtAAAAABJRU5ErkJggg==);
   background-size: contain;
   background-repeat: no-repeat;
 }
 
 .action-text {
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 500;
 }
 
 .action-item:nth-child(2) .action-text {
-  color: #ff4d4f;
+  color: var(--danger-color, #B5544A);
 }
 
 .action-item:nth-child(1) .action-text {
@@ -731,11 +727,11 @@ textarea {
 
 .dialog-content {
   background-color: var(--bg-color);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   width: 90%;
   max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--sidebar-border, var(--border-subtle));
 }
 
 .dialog-header {
@@ -743,20 +739,20 @@ textarea {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
+  border-bottom: 1px solid var(--sidebar-border, var(--border-subtle));
   background-color: var(--sidebar-bg, var(--bg-color));
 }
 
 .dialog-title {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--text-color);
 }
 
 .dialog-close {
-  font-size: 20px;
+  font-size: var(--fs-xl);
   cursor: pointer;
-  color: #999999;
+  color: var(--text-muted, #999999);
   transition: color 0.3s ease;
 }
 
@@ -766,7 +762,7 @@ textarea {
 
 .dialog-body {
   padding: 20px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: var(--text-color);
   line-height: 1.5;
 }
@@ -775,18 +771,18 @@ textarea {
   display: flex;
   justify-content: flex-end;
   padding: 16px 20px;
-  border-top: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
-  gap: 10px;
+  border-top: 1px solid var(--sidebar-border, var(--border-subtle));
+  gap: 12px;
   background-color: var(--sidebar-bg, var(--bg-color));
 }
 
 .dialog-btn {
   padding: 8px 16px;
-  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.05));
-  border-radius: 4px;
-  font-size: 14px;
+  border: 1px solid var(--sidebar-border, var(--border-subtle));
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-body);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .cancel-btn {

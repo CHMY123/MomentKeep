@@ -15,17 +15,17 @@
         <div class="action-card" @click="navigateTo('/pages/daily-checkin/daily-checkin')">
           <div class="action-icon icon-clock"></div>
           <h3 class="action-title">每日打卡</h3>
-          <p class="action-subtitle">记录每一个瞬间</p>
+          <p class="action-subtitle">早起、睡眠、用餐、运动</p>
         </div>
         <div class="action-card" @click="navigateTo('/pages/todo/todo')">
           <div class="action-icon icon-todo"></div>
           <h3 class="action-title">今日待办</h3>
-          <p class="action-subtitle">完成每一个目标</p>
+          <p class="action-subtitle">添加、勾选、查看</p>
         </div>
         <div class="action-card" @click="navigateTo('/pages/countdown/countdown')">
           <div class="action-icon icon-time"></div>
           <h3 class="action-title">未来倒计时</h3>
-          <p class="action-subtitle">期待每一个重要时刻</p>
+          <p class="action-subtitle">距重要日子还有几天</p>
         </div>
       </div>
       
@@ -36,7 +36,7 @@
           <span class="section-more" @click="navigateTo('/pages/countdown/countdown')">查看全部</span>
         </div>
         <div class="countdown-list">
-          <div v-for="(countdown, index) in countdowns" :key="index" class="countdown-card">
+          <div v-for="(countdown, index) in countdowns" :key="index" class="countdown-card stagger-item">
             <div class="countdown-time">
               <span class="time-number">{{ countdown.days }}</span>
               <span class="time-unit">天</span>
@@ -151,7 +151,6 @@ const fetchCountdowns = async () => {
 
   const fetchFn = async () => {
     const response = await get('/countdown', {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -207,7 +206,6 @@ const fetchCheckinStats = async () => {
 
   const fetchFn = async () => {
     const response = await get(`/checkin/by-date`, { date }, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
 
     if (response.code === 200) {
@@ -303,11 +301,11 @@ onMounted(async () => {
 /* 欢迎区域 */
 .welcome-section {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .welcome-title {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   color: #C2977F;
   margin-bottom: 8px;
@@ -315,36 +313,36 @@ onMounted(async () => {
 }
 
 .welcome-subtitle {
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--fs-body);
+  color: var(--text-secondary, #666666);
 }
 
 /* 快捷功能区 */
 .quick-actions {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .action-card {
   flex: 1;
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 20px;
   margin: 0 8px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-interactive);
   cursor: pointer;
 }
 
 .action-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
 }
 
 .action-card .action-icon {
-  font-size: 32px;
+  font-size: var(--fs-4xl);
   margin-bottom: 12px;
   width: 32px;
   height: 32px;
@@ -358,35 +356,35 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  font-weight: bold;
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold); /* 原为 bold(700)，归一为 600 */
 }
 
 .stat-icon.checked {
-  color: #4CAF50;
+  color: var(--success-color, #7C9A6D);
 }
 
 .stat-icon:not(.checked) {
-  color: #F44336;
+  color: var(--danger-color, #B5544A);
 }
 
 .stat-number {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   color: #C2977F;
 }
 
 .action-title {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   display: block;
   margin-bottom: 4px;
 }
 
 .action-subtitle {
-  font-size: 12px;
-  color: #999999;
+  font-size: var(--fs-xs);
+  color: var(--text-muted, #999999);
 }
 
 /* 通用区域样式 */
@@ -398,37 +396,37 @@ onMounted(async () => {
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   border-bottom: 1px solid #94A7C8;
   padding-bottom: 4px;
 }
 
 .section-more {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #94A7C8;
   cursor: pointer;
 }
 
 /* 倒计时区域 */
 .countdown-section {
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .countdown-list {
   display: flex;
   overflow-x: auto;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
 }
 
 .countdown-card {
   min-width: 120px;
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-right: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -441,41 +439,41 @@ onMounted(async () => {
 }
 
 .time-number {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   color: #C2977F;
 }
 
 .time-unit {
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--fs-body);
+  color: var(--text-secondary, #666666);
   margin-left: 4px;
 }
 
 .countdown-title {
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin-bottom: 4px;
   text-align: center;
 }
 
 .countdown-date {
-  font-size: 12px;
-  color: #999999;
+  font-size: var(--fs-xs);
+  color: var(--text-muted, #999999);
 }
 
 .empty-countdown {
   flex: 1;
   text-align: center;
   padding: 40px 0;
-  color: #999999;
-  font-size: 14px;
+  color: var(--text-muted, #999999);
+  font-size: var(--fs-body);
 }
 
 /* 统计区域 */
 .stats-section {
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .stats-grid {
@@ -485,15 +483,15 @@ onMounted(async () => {
 }
 
 .stat-item {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 20px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   color: #C2977F;
   display: block;
@@ -501,8 +499,8 @@ onMounted(async () => {
 }
 
 .stat-label {
-  font-size: 14px;
-  color: #666666;
+  font-size: var(--fs-body);
+  color: var(--text-secondary, #666666);
 }
 
 /* 响应式设计 */
@@ -519,4 +517,18 @@ onMounted(async () => {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ==== 设计修订（覆盖规则，勿手改上面旧值） ==== */
+/* 区块标题原本带一条 1px 实线下划线，全站仅首页有——装饰不承载信息，且与其它页面不一致 */
+.section-title {
+  border-bottom: none;
+  padding-bottom: 0;
+  text-decoration: none;
+}
+
+/* #999999 在米色卡片上对比度约 2.8:1，不达 4.5:1 的无障碍下限 */
+.action-subtitle {
+  color: var(--text-secondary, #666666);
+}
+
 </style>

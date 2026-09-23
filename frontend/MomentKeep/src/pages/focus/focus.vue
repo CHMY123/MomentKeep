@@ -149,14 +149,14 @@
           <div 
             v-for="todo in uncompletedTodos" 
             :key="todo.id"
-            class="todo-selector-item"
+            class="todo-selector-item stagger-item"
             @click="selectTodo(todo)"
           >
             {{ todo.title }}
           </div>
         </div>
         <div v-else class="no-todos-message">
-          暂无未完成的待办事项，请先添加待办
+          还没有待办 · 先去「今日待办」添加一件
         </div>
       </div>
 
@@ -167,7 +167,7 @@
           <div 
             v-for="record in todayRecords" 
             :key="record.id"
-            class="record-item"
+            class="record-item stagger-item"
           >
             <div class="record-info">
               <span class="record-mode">{{ getModeName(record.mode) }}</span>
@@ -177,7 +177,7 @@
             <span class="record-time">{{ formatRecordTime(record.startTime) }}</span>
           </div>
           <div v-if="todayRecords.length === 0" class="no-records">
-            暂无专注记录
+            今天还没有专注记录
           </div>
         </div>
       </div>
@@ -248,47 +248,9 @@ const pomodoroBreakMinutes = ref(5)
 const pomodoroRound = ref(1)
 const maxPomodoros = ref(4)
 
-// 鼓励语
+// 过程提示
 const showEncouragement = ref(false)
 const currentEncouragement = ref('')
-const encouragements = {
-  start: [
-    '专注当下，你会发现不一样的自己！',
-    '开始专注吧，每一次努力都在积累！',
-    '专注是一种力量，坚持就是胜利！',
-    '用心专注，成就更好的自己！'
-  ],
-  running: [
-    '保持专注，你正在超越大多数人！',
-    '坚持就是胜利，继续加油！',
-    '专注的你最美丽，继续保持！',
-    '每分每秒都在创造价值！'
-  ],
-  half: [
-    '已经完成一半了，继续坚持！',
-    '不错哦，继续保持专注！',
-    '你已经进入状态了！',
-    '加油！胜利就在眼前！'
-  ],
-  almost: [
-    '马上就完成了，再坚持一下！',
-    '最后冲刺阶段，不要放弃！',
-    '胜利就在眼前，继续加油！',
-    '你做得很好，马上就完成了！'
-  ],
-  completed: [
-    '太棒了！你完成了这次专注！',
-    '恭喜你，又完成了一次专注！',
-    '专注力满满，为你点赞！',
-    '做得好！继续保持！'
-  ],
-  break: [
-    '休息一下吧，你值得！',
-    '休息是为了更好地出发！',
-    '放松一下，短暂休息！',
-    '休息时光，好好享受！'
-  ]
-}
 
 // 关联待办
 const todos = ref([])
@@ -372,19 +334,37 @@ const getModeName = (mode) => {
 
 // 显示鼓励语
 const showEncouragementMessage = (type) => {
-  const messages = encouragements[type]
-  if (messages && messages.length > 0) {
-    const randomIndex = Math.floor(Math.random() * messages.length)
-    currentEncouragement.value = messages[randomIndex]
-    showEncouragement.value = true
-    if (encouragementTimer) {
-      clearTimeout(encouragementTimer)
-    }
-    encouragementTimer = setTimeout(() => {
-      showEncouragement.value = false
-      encouragementTimer = null
-    }, 3000)
+  const totalMinutes = pomodoroMinutes.value
+  const elapsedMinutes = Math.floor(calcElapsedSeconds() / 60)
+  const remainingMinutes = Math.max(0, totalMinutes - elapsedMinutes)
+  const round = pomodoroRound.value
+
+  /*
+   * 原实现是从 6 组、每组 4 条（共 30 条）的固定鼓励语里随机取一句：
+   * 内容与真实进度无关，句式可整体替换（把"专注"换成"跑步"依然成立），
+   * 属于情绪填充。现在按当前会话的真实数据生成，每句话都对应一个事实。
+   */
+  const texts = {
+    start: `第 ${round} 轮 / 共 ${maxPomodoros.value} 轮 · 本轮 ${totalMinutes} 分钟`,
+    running: `已专注 ${elapsedMinutes} 分钟 · 还剩 ${remainingMinutes} 分钟`,
+    half: `已过一半 · 本轮还剩约 ${remainingMinutes} 分钟`,
+    almost: `还剩约 ${Math.max(1, remainingMinutes)} 分钟 · 本轮即将结束`,
+    completed: `完成第 ${round} 轮 · 本轮 ${totalMinutes} 分钟`,
+    break: `休息 ${pomodoroBreakMinutes.value} 分钟 · 之后进入第 ${Math.min(round + 1, maxPomodoros.value)} 轮`
   }
+
+  const text = texts[type]
+  if (!text) return
+
+  currentEncouragement.value = text
+  showEncouragement.value = true
+  if (encouragementTimer) {
+    clearTimeout(encouragementTimer)
+  }
+  encouragementTimer = setTimeout(() => {
+    showEncouragement.value = false
+    encouragementTimer = null
+  }, 3000)
 }
 
 // 开始计时
@@ -636,7 +616,6 @@ const saveRecord = async () => {
     }
     
     await post('/focus/record', recordData, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
     
     // 重新获取记录
@@ -652,7 +631,6 @@ const fetchTodos = async () => {
   
   try {
     const response = await get('/todo/today', {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
     
     if (response.code === 200) {
@@ -669,7 +647,6 @@ const fetchRecords = async () => {
   
   try {
     const response = await get('/focus/records', {}, {
-      'Authorization': `Bearer ${userStore.getToken}`
     })
     
     if (response.code === 200) {
@@ -717,23 +694,23 @@ onUnmounted(() => {
 /* 模式选择标签 */
 .mode-tabs {
   display: flex;
-  gap: 10px;
-  margin-bottom: 30px;
-  background-color: #F2EEE8;
-  border-radius: 12px;
-  padding: 6px;
+  gap: 12px;
+  margin-bottom: 32px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
+  padding: 8px;
 }
 
 .mode-tab {
   flex: 1;
   text-align: center;
   padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   font-weight: 500;
   color: #666;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .mode-tab.active {
@@ -750,13 +727,13 @@ onUnmounted(() => {
   text-align: center;
   margin-bottom: 24px;
   padding: 40px 20px;
-  background-color: #F2EEE8;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .timer-time {
-  font-size: 64px;
+  font-size: calc(64px * var(--font-scale, 1));
   font-weight: 600;
   color: #333;
   font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
@@ -764,7 +741,7 @@ onUnmounted(() => {
 }
 
 .timer-status {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #666;
   margin-top: 8px;
 }
@@ -775,14 +752,14 @@ onUnmounted(() => {
   margin-bottom: 24px;
   padding: 16px;
   background: linear-gradient(135deg, #C2977F 0%, #D8C8BE 100%);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   animation: fadeIn 0.5s ease;
 }
 
 .encouragement-text {
   color: white;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-normal); /* 正文应为 400；原 500 是把"标签的重量"用在了描述文字上 */
 }
 
 @keyframes fadeIn {
@@ -793,11 +770,11 @@ onUnmounted(() => {
 /* 时间设置 */
 /* 时长设置区：套上与全站一致的实色卡片，避免在背景图上浮着看不清 */
 .time-settings {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 /* 倒计时时长步进器：− / 数值 / +（替代原先样式突兀的裸 input） */
@@ -813,14 +790,14 @@ onUnmounted(() => {
   height: 40px;
   line-height: 38px;
   text-align: center;
-  font-size: 22px;
+  font-size: calc(22px * var(--font-scale, 1));
   color: #C2977F;
-  background-color: #FFFFFF;
-  border: 1px solid #D8C8BE;
-  border-radius: 50%;
+  background-color: var(--surface-strong, #FFFFFF)FF;
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-circle);
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s ease;
+  transition: var(--transition-interactive);
 }
 
 .stepper-btn:active {
@@ -829,7 +806,7 @@ onUnmounted(() => {
 
 .stepper-btn.disabled {
   color: #CCCCCC;
-  border-color: #E8E4DE;
+  border-color: var(--border-color-light, #E8E4DE);
   cursor: not-allowed;
 }
 
@@ -841,21 +818,21 @@ onUnmounted(() => {
 }
 
 .stepper-number {
-  font-size: 28px;
+  font-size: var(--fs-3xl);
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .stepper-unit {
-  font-size: 13px;
-  color: #666666;
-  margin-left: 6px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary, #666666);
+  margin-left: 8px;
 }
 
 .time-hint {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #999999;
+  margin-top: 12px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted, #999999);
   text-align: center;
 }
 
@@ -866,16 +843,16 @@ onUnmounted(() => {
 }
 
 .time-preset {
-  padding: 10px 20px;
-  border: 1px solid #D8C8BE;
-  border-radius: 20px;
-  font-size: 14px;
+  padding: 12px 20px;
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-body);
   color: #666;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
   /* 卡片已提供背景，这里用实色白底：backdrop-filter 仅 H5 生效，
      去掉可保证三端观感一致 */
-  background-color: #FFFFFF;
+  background-color: var(--surface-strong, #FFFFFF)FF;
 }
 
 .time-preset.active {
@@ -894,17 +871,17 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   gap: 16px;
-  margin-bottom: 30px;
+  margin-bottom: 32px;
 }
 
 .control-btn {
-  padding: 14px 32px;
+  padding: 16px 32px;
   border: none;
-  border-radius: 25px;
-  font-size: 16px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-md);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
   min-width: 100px;
 }
 
@@ -927,9 +904,9 @@ onUnmounted(() => {
 }
 
 .reset-btn {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   color: #666;
-  border: 1px solid #D8C8BE;
+  border: 1px solid var(--border-color, #D8C8BE);
 }
 
 .reset-btn:hover {
@@ -947,15 +924,15 @@ onUnmounted(() => {
 
 /* 关联待办 */
 .related-todo {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .related-todo-label {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #666;
   margin-bottom: 8px;
 }
@@ -964,20 +941,20 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  background-color: white;
-  border-radius: 8px;
+  padding: 12px 12px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border-radius: var(--radius-sm);
 }
 
 .todo-title {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #333;
   font-weight: 500;
 }
 
 .todo-remove {
   color: #999;
-  font-size: 18px;
+  font-size: var(--fs-lg);
   cursor: pointer;
   padding: 0 8px;
 }
@@ -990,17 +967,17 @@ onUnmounted(() => {
 /* 「请选择专注任务」原先没有任何背景，文字直接浮在页面背景图上导致看不清，
    这里套上与全站一致的实色卡片并加深标题颜色 */
 .todo-selector {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .todo-selector-title {
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin-bottom: 12px;
 }
 
@@ -1012,13 +989,13 @@ onUnmounted(() => {
 
 .todo-selector-item {
   padding: 8px 16px;
-  background-color: white;
-  border: 1px solid #D8C8BE;
-  border-radius: 20px;
-  font-size: 13px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-sm);
   color: #666;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1038,12 +1015,12 @@ onUnmounted(() => {
 .custom-input-btn {
   padding: 8px 16px;
   border: 1px solid #C2977F;
-  border-radius: 20px;
-  font-size: 13px;
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-sm);
   color: #C2977F;
   background-color: transparent;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .custom-input-btn:hover {
@@ -1053,14 +1030,14 @@ onUnmounted(() => {
 
 /* 自定义专注内容输入 */
 .custom-focus-input {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 24px;
 }
 
 .custom-input-title {
-  font-size: 14px;
+  font-size: var(--fs-body);
   color: #666;
   margin-bottom: 12px;
 }
@@ -1073,9 +1050,9 @@ onUnmounted(() => {
 .custom-input {
   flex: 1;
   padding: 12px;
-  border: 1px solid #D8C8BE;
-  border-radius: 8px;
-  font-size: 14px;
+  border: 1px solid var(--border-color, #D8C8BE);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   background-color: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
 }
@@ -1083,12 +1060,12 @@ onUnmounted(() => {
 .save-btn {
   padding: 12px 24px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-body);
   color: white;
   background-color: #C2977F;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-interactive);
 }
 
 .save-btn:hover {
@@ -1097,15 +1074,15 @@ onUnmounted(() => {
 
 /* 专注记录 */
 .focus-records {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .records-title {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: #333;
   margin-bottom: 12px;
@@ -1120,9 +1097,9 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  background-color: white;
-  border-radius: 8px;
+  padding: 12px 12px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border-radius: var(--radius-sm);
   margin-bottom: 8px;
 }
 
@@ -1134,18 +1111,18 @@ onUnmounted(() => {
 }
 
 .record-mode {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: #C2977F;
   font-weight: 500;
 }
 
 .record-duration {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: #333;
 }
 
 .record-todo {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #666;
   max-width: 120px;
   overflow: hidden;
@@ -1154,27 +1131,27 @@ onUnmounted(() => {
 }
 
 .record-time {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #999;
 }
 
 .no-records {
   text-align: center;
   color: #999;
-  font-size: 14px;
+  font-size: var(--fs-body);
   padding: 20px;
 }
 
 /* 专注统计 */
 .focus-stats {
-  background-color: #F2EEE8;
-  border-radius: 12px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: var(--radius-md);
   padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
 }
 
 .stats-title {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: #333;
   margin-bottom: 12px;
@@ -1187,20 +1164,20 @@ onUnmounted(() => {
 }
 
 .stat-card {
-  background-color: white;
-  border-radius: 8px;
+  background-color: var(--surface-strong, #FFFFFF);
+  border-radius: var(--radius-sm);
   padding: 16px;
   text-align: center;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: #666;
   margin-bottom: 8px;
 }
 
 .stat-value {
-  font-size: 16px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: #C2977F;
 }
