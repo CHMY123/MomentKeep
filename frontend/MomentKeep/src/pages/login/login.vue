@@ -3,7 +3,8 @@
     <view class="login-card">
       <!-- LOGO 区域（已修复） -->
       <view class="logo-container">
-        <image src="../../static/logo.png" class="logo" mode="aspectFit"></image>
+        <!-- 改用缤纷云上的 logo：不再把 1.16MB 的图片打进包体（与"关于我们"页同一地址） -->
+        <image src="https://momentkeep.s3.bitiful.net/logos/logo.png" class="logo" mode="aspectFit"></image>
         <view class="title-wrapper">
           <text class="app-name">朝暮记</text>
           <text class="app-slogan">打卡 · 待办 · 专注 · 倒计时</text>

@@ -4,7 +4,7 @@
       <!-- 项目信息 -->
       <div class="about-section">
         <div class="logo-section">
-          <img src="https://momentkeep.s3.bitiful.net/avatars/logo.png" alt="朝暮记" class="logo" />
+          <img src="https://momentkeep.s3.bitiful.net/logos/logo.png" alt="朝暮记" class="logo" />
           <span class="app-name">朝暮记</span>
           <span class="app-slogan">朝有目标，暮有记录</span>
         </div>

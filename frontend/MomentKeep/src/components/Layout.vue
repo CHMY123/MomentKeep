@@ -105,7 +105,7 @@
           </div>
         </div>
         <div v-for="(message, index) in aiMessages" :key="index" class="ai-message stagger-item" :class="message.type === 'user' ? 'ai-message-user' : 'ai-message-bot'">
-          <div v-if="message.type === 'user'" class="ai-avatar" :style="{ backgroundImage: toCssUrl(userAvatar || 'https://momentkeep.s3.bitiful.net/avatars/logo.png') }"></div>
+          <div v-if="message.type === 'user'" class="ai-avatar" :style="{ backgroundImage: toCssUrl(userAvatar || 'https://momentkeep.s3.bitiful.net/logos/logo.png') }"></div>
           <div v-else class="ai-avatar" :style="{ backgroundImage: `url('https://momentkeep.s3.bitiful.net/avatars/AI%20assistant.png')` }"></div>
           <div class="ai-message-content">
             <div v-if="message.loading" class="loading-indicator">
