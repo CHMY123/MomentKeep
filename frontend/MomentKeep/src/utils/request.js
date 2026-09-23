@@ -63,6 +63,24 @@ export const buildUrl = (url) => {
 }
 
 /**
+ * 把资源地址安全地嵌入 CSS url()
+ *
+ * @description 用户上传的图片会保留原始文件名（例如「..._微信图片_20240922234533.jpg」）。
+ * 直接拼成 url(https://.../微信图片.jpg) 时，未加引号的非 ASCII 字符会让整条声明解析失败，
+ * 表现为 background-image 完全不生效——而同一地址用 <image src> 却能正常显示。
+ * 这里统一加双引号，并只对非 ASCII 字符和双引号做百分号编码：
+ * 已是 %xx 形式的字符属于 ASCII，不会被二次编码。
+ *
+ * @param {string} url 资源地址
+ * @returns {string} 可直接赋给 background-image 的 url(...) 字符串；地址为空时返回 ''
+ */
+export const toCssUrl = (url) => {
+  if (!url) return ''
+  const safe = String(url).replace(/[^\x20-\x7E]|["]/g, (char) => encodeURIComponent(char))
+  return `url("${safe}")`
+}
+
+/**
  * 读取本地保存的 token
  * @returns {string} token
  */

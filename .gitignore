@@ -7,7 +7,9 @@
 
 # 忽略所有配置文件（敏感信息）
 **/application-dev.yml
-**/application-prod.yml
+### 生产配置：src/main/resources/application-prod.yml 是随仓库交付的**无密钥**配置
+### （关闭 Swagger、日志与线程池等），必须纳入版本库，故不再忽略。
+### 若需服务器本地覆盖，请放在 /opt/momentkeep/current/ 下（仓库之外）。
 **/bootstrap.yml
 
 ### STS ###

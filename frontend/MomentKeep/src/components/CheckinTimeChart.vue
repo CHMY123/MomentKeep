@@ -4,17 +4,24 @@
     <view v-if="total > 0" class="chart-legend">
       <view class="legend-item">
         <view class="legend-dot legend-dot-bar"></view>
-        <text class="legend-text">各时段次数（左轴）</text>
+        <text class="legend-text">{{ scopeLabel }}次数（左轴）</text>
       </view>
-      <view class="legend-item">
+      <view v-if="showRate" class="legend-item">
         <view class="legend-dot legend-dot-line"></view>
-        <text class="legend-text">累计次数（右轴）</text>
+        <text class="legend-text">打卡率（右轴）</text>
       </view>
     </view>
 
     <!-- 容器始终存在，便于测量宽度与绑定 ResizeObserver -->
-    <view class="chart-wrap">
+    <view class="chart-wrap" :style="{ height: canvasStyleHeight }">
+      <!--
+        canvas 只在有数据时挂载：无数据时把它从 DOM 上移除，而不是"擦除画布"。
+        uni 的非 2d 画布由指令队列驱动，clearRect 与后续帧之间存在时序问题——
+        实测从有数据口径切到无数据口径时，旧图仍会留在画布上。
+        移除元素可以从结构上排除这一类残留，不必依赖清空是否生效。
+      -->
       <canvas
+        v-if="total > 0"
         id="checkinTimeChart"
         canvas-id="checkinTimeChart"
         class="chart-canvas"
@@ -23,7 +30,7 @@
         @touchmove="onPointerMove"
         @touchend="onPointerOut"
       ></canvas>
-      <view v-if="total === 0" class="chart-empty">
+      <view v-else class="chart-empty">
         <text>暂无打卡数据</text>
       </view>
     </view>
@@ -31,16 +38,16 @@
     <!--
       数值提示条：固定在图表下方，而不是跟随手指的气泡。
       气泡方案在窄屏容易贴边被裁切（正是此前"图表溢出屏幕"的同一类问题），
-      固定提示条既能完整显示，又能同时给出「该时段」和「累计」两个值。
+      固定提示条既能完整显示，又能同时给出「次数」和「打卡率」两个不同维度的值。
     -->
     <view class="chart-tip">
       <template v-if="activeIndex >= 0">
         <text class="tip-range">{{ bucketLabels[activeIndex] }}</text>
         <text class="tip-value">该时段 {{ counts[activeIndex] }} 次</text>
-        <text class="tip-value">累计 {{ cumulatives[activeIndex] }} 次</text>
+        <text v-if="showRate" class="tip-value">打卡率 {{ rateSeries[activeIndex] }}%</text>
       </template>
       <text v-else class="tip-hint">
-        {{ total > 0 ? '点击柱状图或折线节点，可查看该时段的具体次数' : '暂无打卡数据' }}
+        {{ total > 0 ? (showRate ? '点击柱状图或折线节点，可查看该时段的次数与打卡率' : '点击柱状图，可查看该时段的具体次数') : '暂无打卡数据' }}
       </text>
     </view>
   </view>
@@ -52,7 +59,7 @@
  *
  * 设计要点：
  * 1. 尺寸：进入页面后测量容器真实 px 宽度，canvas 宽度与之严格相等 → 结构上不可能溢出屏幕；
- * 2. 双轴：左轴 = 单时段次数（柱），右轴 = 累计次数（折线，平滑曲线），两轴各自用 niceMax 取动态量程；
+ * 2. 双轴：左轴 = 各时段次数（柱），右轴 = 打卡率（折线，0~100%），两轴单位不同、各自取量程；
  * 3. 窄屏：按"每个标签所需宽度"动态抽稀横轴标签（置空而非缩放），避免文字重叠；
  * 4. 交互：点击/长按/悬停时通过 chart.getCurrentDataIndex 定位数据点，在下方固定提示条展示数值；
  * 5. 重绘：uCharts 会就地修改配置对象，因此每次重绘都重建 opts；容器尺寸变化时防抖重绘。
@@ -65,6 +72,23 @@ const props = defineProps({
   buckets: {
     type: Array,
     default: () => []
+  },
+  /**
+   * 打卡率（%）：与 buckets 等长的 12 个值，供折线使用
+   *
+   * @description 打卡率 = 该时段有打卡的天数 ÷ 区间内活跃天数。
+   * 它与柱状的「次数」是两个互相独立的维度：次数说明"打得多不多"，
+   * 打卡率说明"坚持得久不久"（一天只在 7 点打一次，次数低但坚持度可以是 100%）。
+   * 空数组表示不提供，此时图表退化为纯柱状图，不会画一条全 0 的线。
+   */
+  rate: {
+    type: Array,
+    default: () => []
+  },
+  /** 当前统计口径名称（全部 / 早起 / 睡眠 / 用餐 / 运动），用于图例与提示文案 */
+  scopeLabel: {
+    type: String,
+    default: '全部'
   }
 })
 
@@ -97,12 +121,6 @@ const bucketLabels = computed(() => props.buckets.map(item => item.label || ''))
 /** 柱状：各时段次数 */
 const counts = computed(() => props.buckets.map(item => Number(item.count) || 0))
 
-/** 折线：累计次数（单调递增，与柱状量级差异明显 → 双轴才有意义） */
-const cumulatives = computed(() => {
-  let sum = 0
-  return counts.value.map(count => (sum += count))
-})
-
 /** 取"好看"的每格步长：1 / 2 / 2.5 / 5 / 10 的 10^n 倍 */
 const niceStep = raw => {
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)))
@@ -129,8 +147,23 @@ const niceMax = (rawMax, minTop = SPLIT_NUMBER) => {
   return Math.max(Math.ceil(step) * SPLIT_NUMBER, minTop)
 }
 
-const leftAxisMax = computed(() => niceMax(Math.max(...counts.value, 0)))
-const rightAxisMax = computed(() => niceMax(Math.max(...cumulatives.value, 0)))
+/** 柱与折线各自成轴，故分别给量程：次数取 niceMax，打卡率固定 0~100 */
+const axisMax = computed(() => niceMax(Math.max(...counts.value, 0)))
+
+/** 折线数据：打卡率（%） */
+const rateSeries = computed(() => props.rate.map(value => Number(value) || 0))
+
+/**
+ * 是否绘制打卡率折线
+ *
+ * @description 三个条件缺一不可：有数据、长度与柱状对齐、至少有一个非零值。
+ * 否则（例如某类型在区间内一次都没打卡）画一条贴底的零线只会造成误解。
+ */
+const showRate = computed(() =>
+  counts.value.length > 0 &&
+  rateSeries.value.length === counts.value.length &&
+  rateSeries.value.some(value => value > 0)
+)
 
 /** 当前窗口宽度（用于桌面/移动分支与标签抽稀） */
 const getWindowWidth = () => {
@@ -178,25 +211,35 @@ const buildOptions = (width, height, narrow) => ({
   categories: buildCategories(width, narrow),
   series: [
     {
-      name: '各时段次数',
+      name: '次数',
       type: 'column',
       data: counts.value,
-      color: '#C2977F'
+      color: '#C2977F',
+      // 【必须显式声明】uCharts 的 calYAxisData 是按 series.index 把数据分到各根 Y 轴的，
+      // 不是按 yAxisIndex（见 u-charts.js：if (series[j].index == i)）。
+      // 声明后柱状归左轴、折线归右轴，各自按自己的量程绘制。
+      index: 0
     },
-    {
-      name: '累计次数',
-      type: 'line',
-      data: cumulatives.value,
-      color: '#94A7C8',
-      yAxisIndex: 1, // 挂到右轴
-      width: 2,
-      // 【关键】mix 组合图的曲线开关在这里，不在 extra.line.type。
-      // uCharts 源码中两条绘制路径取值方式不同：
-      //   drawLineDataPoints（type:'line'）  -> 读 lineOption.type（即 extra.line.type）
-      //   drawMixDataPoints（type:'mix'）    -> 只读 eachSeries.style
-      // 因此组合图必须把 style 写在折线 series 自身，否则画出来始终是折线。
-      style: 'curve'
-    }
+    // 折线 = 打卡率（%）——与柱状的「次数」是两个互相独立的维度：
+    // 次数看"打得多不多"，打卡率看"坚持得久不久"（一天只在 7 点打一次，次数低但坚持度可到 100%）。
+    // 没有可用的打卡率数据时整条折线不注册，图表自然退化为纯柱状图，而不是画一条贴底的零线。
+    ...(showRate.value
+      ? [{
+          name: '打卡率',
+          type: 'line',
+          data: rateSeries.value,
+          color: '#94A7C8',
+          // 挂到第 2 根 Y 轴（百分比），量程 0~100 由下面 yAxis.data[1] 指定
+          index: 1,
+          width: 2,
+          // 【关键】mix 组合图的曲线开关在这里，不在 extra.line.type。
+          // uCharts 源码中两条绘制路径取值方式不同：
+          //   drawLineDataPoints（type:'line'）  -> 读 lineOption.type（即 extra.line.type）
+          //   drawMixDataPoints（type:'mix'）    -> 只读 eachSeries.style
+          // 因此组合图必须把 style 写在折线 series 自身，否则画出来始终是折线。
+          style: 'curve'
+        }]
+      : [])
   ],
   xAxis: {
     disableGrid: true,
@@ -208,7 +251,9 @@ const buildOptions = (width, height, narrow) => ({
     scrollShow: false,
     rotateLabel: false
   },
-  // 注意：双 Y 轴必须是 { data: [...] } 结构，写成数组会静默失效
+  // 注意：双 Y 轴必须是 { data: [...] } 结构，写成数组会静默失效。
+  // 这里两根轴的单位不同（次 / %），属于双轴的正确用法；
+  // 与早期"柱=次数、线=累计次数"那种同量纲却硬拆两轴的写法不同。
   yAxis: {
     disabled: false,
     splitNumber: SPLIT_NUMBER,
@@ -222,19 +267,23 @@ const buildOptions = (width, height, narrow) => ({
     data: [
       {
         min: 0,
-        max: leftAxisMax.value,
+        max: axisMax.value,
         fontColor: '#C2977F',
         axisLineColor: '#E3D3C7',
         // 兜底：即使量程异常，刻度也只显示整数（次数不接受小数）
         format: value => String(Math.round(value))
       },
-      {
-        min: 0,
-        max: rightAxisMax.value,
-        fontColor: '#94A7C8',
-        axisLineColor: '#C7D2E2',
-        format: value => String(Math.round(value))
-      }
+      ...(showRate.value
+        ? [{
+            min: 0,
+            max: 100,
+            // 不声明 position 时 uCharts 会把两根轴的刻度都画在左侧
+            position: 'right',
+            fontColor: '#94A7C8',
+            axisLineColor: '#C7D2E2',
+            format: value => Math.round(value) + '%'
+          }]
+        : [])
     ]
   },
   // 图例交给 view 渲染，canvas 内不再画图例
@@ -248,7 +297,10 @@ const buildOptions = (width, height, narrow) => ({
     // 当前 mix 类型的曲线由上面 series[1].style === 'curve' 决定。
     line: { type: 'curve' },
     mix: {
-      column: { seriesGap: 2 },
+      // uCharts 用 column.width 对柱宽取上限（源码：item.width = Math.min(item.width, width)），
+      // 不设时柱宽会撑满整个分类槽位，相邻柱就会黏在一起。
+      // 窄屏槽位本就窄，给 14px；宽屏给 22px，留出明显间隔。
+      column: { seriesGap: 2, width: narrow ? 14 : 22 },
       line: { type: 'curve' }
     },
     tooltip: {
@@ -272,23 +324,27 @@ const renderChart = async () => {
   const narrow = getWindowWidth() < BREAKPOINT
   const height = narrow ? 200 : 300
 
+  // 先定尺寸：即使当前没有数据、canvas 不挂载，容器也要保持高度，空态文案才能垂直居中
   canvasStyleWidth.value = width + 'px'
   canvasStyleHeight.value = height + 'px'
 
   activeIndex.value = -1
 
-  // 先无条件清空画布。
-  // uCharts 的 background 设为 transparent，它不会自行擦除上一帧，
-  // 若不清空，从「全部」切到无数据的「近30天」时会残留上一次画出的图形。
-  const context = uni.createCanvasContext(CANVAS_ID, instance.proxy)
-  context.clearRect(0, 0, width, height)
-
+  // 无数据：不绘制任何东西。
+  // 模板里 canvas 是 v-if="total > 0"，此处 return 后画布随之下线，
+  // 因此不需要（也不应该）在这里 clearRect —— 那时元素已经不存在了。
+  // 之前正是"先 clearRect 再 return"，实测切到无数据口径后旧图仍留在画布上；
+  // 现在改为从 DOM 上移除元素，结构上排除残留。
   if (total.value === 0) {
     chart = null
-    // 非 2d 画布需要显式 flush，清空才会真正生效
-    context.draw()
     return
   }
+
+  // 先无条件清空画布：
+  // uCharts 的 background 设为 transparent，它不会自行擦除上一帧，
+  // 若不清空，数据口径之间切换（柱高、折线形状都不同）时会叠着上一帧。
+  const context = uni.createCanvasContext(CANVAS_ID, instance.proxy)
+  context.clearRect(0, 0, width, height)
 
   const options = buildOptions(width, height, narrow)
   options.context = context
@@ -579,7 +635,7 @@ defineExpose({
 }
 
 .legend-text {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: #888888;
 }
 
@@ -606,7 +662,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   line-height: 1.4;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: #aaaaaa;
 }
 
@@ -619,24 +675,24 @@ defineExpose({
   min-height: 20px;
   margin-top: 8px;
   padding: 6px 10px;
-  background-color: #ffffff;
+  background-color: var(--surface-strong, #FFFFFF)ff;
   border-radius: 8px;
   box-sizing: border-box;
 }
 
 .tip-range {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 500;
   color: #c2977f;
 }
 
 .tip-value {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: #555555;
 }
 
 .tip-hint {
-  font-size: 12px;
-  color: #999999;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted, #999999);
 }
 </style>

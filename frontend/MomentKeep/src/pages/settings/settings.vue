@@ -34,6 +34,11 @@
             </div>
           </div>
         </div>
+
+        <!-- 非 H5 端如实说明：动态换肤依赖浏览器 CSS 变量，小程序/App 不支持 -->
+        <div v-if="!supportsDomTheme" class="platform-hint">
+          <span>动态换肤与字号调整依赖浏览器能力，仅在网页端生效；你的偏好会被保存，在网页端登录后自动应用。</span>
+        </div>
         
         <div class="setting-item" @click="chooseBackground">
           <span class="setting-label">背景图片</span>
@@ -179,7 +184,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
-import { post, del, buildUrl } from '../../utils/request'
+import { post, del, buildUrl, toCssUrl } from '../../utils/request'
+import { applyFontScale } from '../../utils/fontScale'
+import { applyTheme as applyThemeVars } from '../../utils/theme'
 
 // 初始化用户store
 const userStore = useUserStore()
@@ -188,6 +195,20 @@ const userStore = useUserStore()
 const themeIndex = ref(0) // 0: 浅色, 1: 深色, 2: 柔和
 const fontSizeIndex = ref(0) // 0: 标准, 1: 偏大, 2: 偏小
 const backgroundImage = ref('')
+
+/**
+ * 当前端是否支持动态换肤 / 改字号
+ *
+ * @description applyTheme / applyFontSize 依赖 document.documentElement 上的 CSS 变量，
+ * 属浏览器专有机制：小程序与 App 端没有 document，调用后界面不会有任何变化。
+ * 该标记用于给用户如实提示——而不是像原来那样无论是否真正生效都弹"已更新"。
+ *
+ * 这里直接复用 applyTheme / applyFontSize 内部的同一判据（typeof document），
+ * 使"是否支持"与"调用后是否真的生效"永远一致。
+ * 采用运行时探测而非 #ifdef 条件编译：条件编译注释会被 Vetur 之类的静态分析工具
+ * 误判为"重复声明"，而 typeof 判断在 uni-app 各端都安全（typeof 不存在的变量不抛错）。
+ */
+const supportsDomTheme = typeof document !== 'undefined' && !!document.documentElement
 
 // AI设置
 const aiAutoFill = ref(true)
@@ -213,9 +234,15 @@ const feedbackTypes = [
 // 方法
 const changeTheme = (index) => {
   themeIndex.value = index
-  // 保存到本地存储
+  // 保存到本地存储（换端登录后仍会读到该偏好）
   uni.setStorageSync('themeIndex', index.toString())
-  // 应用主题
+
+  if (!supportsDomTheme) {
+    // 非 H5 端无法动态换肤：如实告知，避免"点了没反应却说已更新"
+    uni.showToast({ title: '主题偏好已保存，动态换肤仅在网页端生效', icon: 'none' })
+    return
+  }
+
   applyTheme(index)
   uni.showToast({ title: '主题已更新', icon: 'success' })
 }
@@ -224,7 +251,12 @@ const changeFontSize = (index) => {
   fontSizeIndex.value = index
   // 保存到本地存储
   uni.setStorageSync('fontSizeIndex', index.toString())
-  // 应用字体大小
+
+  if (!supportsDomTheme) {
+    uni.showToast({ title: '字体偏好已保存，动态调整仅在网页端生效', icon: 'none' })
+    return
+  }
+
   applyFontSize(index)
   uni.showToast({ title: '字体大小已更新', icon: 'success' })
 }
@@ -262,6 +294,8 @@ const chooseBackground = () => {
           }
         },
         fail: () => {
+          // 注意：这里是上传失败回调，作用域内没有 error 变量。
+          // 之前写 error.message 会在失败时抛 ReferenceError，反而把提示吞掉。
           uni.showToast({ title: '网络错误，背景图片上传失败', icon: 'none' })
         }
       })
@@ -272,6 +306,14 @@ const chooseBackground = () => {
 const resetBackground = async () => {
   backgroundImage.value = ''
   uni.removeStorageSync('backgroundImage')
+
+  // 通知 Layout 立即撤下背景图。
+  // 原先这里只清缓存不通知，Layout 上的旧背景图会一直留到下次挂载才消失。
+  // #ifdef H5
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('background-updated', { detail: { type: 'default' } }))
+  }
+  // #endif
   
   // 通知后端清空背景图片
   if (userStore.getToken) {
@@ -287,71 +329,34 @@ const resetBackground = async () => {
   uni.showToast({ title: '已恢复默认背景', icon: 'success' })
 }
 
-// 应用主题
+/**
+ * 应用主题
+ *
+ * @description 变量表与写入实现都在 utils/theme.js——放在公共模块里，
+ * 应用启动时（App.vue）才能恢复上次选择的主题，否则刷新后会退回浅色。
+ */
 const applyTheme = (index) => {
-  const themes = {
-    0: { // 浅色
-      '--bg-color': '#F8F6F2',
-      '--text-color': '#333333',
-      '--primary-color': '#C2977F',
-      '--secondary-color': '#94A7C8',
-      '--sidebar-bg': '#F2EEE8',
-      '--sidebar-border': 'rgba(0, 0, 0, 0.05)'
-    },
-    1: { // 深色
-      '--bg-color': '#2D2D2D',
-      '--text-color': '#E5E5E5',
-      '--primary-color': '#D8C8BE',
-      '--secondary-color': '#6B7280',
-      '--sidebar-bg': '#1E1E1E',
-      '--sidebar-border': 'rgba(255, 255, 255, 0.1)'
-    },
-    2: { // 柔和
-      '--bg-color': '#F0EAE1',
-      '--text-color': '#4A4A4A',
-      '--primary-color': '#A8846B',
-      '--secondary-color': '#8A9BB0',
-      '--sidebar-bg': '#E8E1D6',
-      '--sidebar-border': 'rgba(0, 0, 0, 0.05)'
-    }
-  }
-  
-  const theme = themes[index]
-  if (!theme) return
-  
-  // 确保在浏览器环境中
-  if (typeof document !== 'undefined') {
-    for (const [key, value] of Object.entries(theme)) {
-      document.documentElement.style.setProperty(key, value)
-    }
-    
-    // 通知Layout组件主题已更新
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('theme-updated', {
-        detail: {
-          themeIndex: index
-        }
-      }))
-    }
+  if (!applyThemeVars(index)) return
+
+  // 通知 Layout 组件主题已更新
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('theme-updated', {
+      detail: {
+        themeIndex: index
+      }
+    }))
   }
 }
 
-// 应用字体大小
-const applyFontSize = (index) => {
-  const sizes = {
-    0: '16px', // 标准
-    1: '18px', // 偏大
-    2: '14px'  // 偏小
-  }
-  
-  // 确保在浏览器环境中
-  if (typeof document !== 'undefined') {
-    document.documentElement.style.setProperty('--base-font-size', sizes[index])
-    
-    // 同时应用到 body
-    document.body.style.fontSize = sizes[index]
-  }
-}
+/**
+ * 应用字号偏好
+ *
+ * @description 原实现只改了 --base-font-size 与 body 的 font-size：
+ * 前者全项目仅 20 处引用，后者会被各组件自己硬编码的 px 字号覆盖，
+ * 所以设置后界面几乎没有变化（就是"形同虚设"的由来）。
+ * 现在改写全项目共用的 --font-scale，所有 calc(Npx * var(--font-scale)) 同步生效。
+ */
+const applyFontSize = (index) => applyFontScale(index)
 
 // 应用背景图片
 const applyBackgroundImage = (imageUrl) => {
@@ -363,7 +368,7 @@ const applyBackgroundImage = (imageUrl) => {
     // 立即更新背景样式
     const backgroundLayer = document.querySelector('.background-layer')
     if (backgroundLayer) {
-      backgroundLayer.style.backgroundImage = `url(${imageUrl})`
+      backgroundLayer.style.backgroundImage = toCssUrl(imageUrl)
       backgroundLayer.style.backgroundSize = 'cover'
       backgroundLayer.style.backgroundPosition = 'center'
       backgroundLayer.style.backgroundRepeat = 'no-repeat'
@@ -450,7 +455,7 @@ const submitFeedback = async () => {
     }
   } catch (error) {
     console.error('提交反馈失败:', error)
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   }
 }
 
@@ -497,9 +502,9 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin-bottom: 16px;
   border-bottom: 1px solid #94A7C8;
   padding-bottom: 8px;
@@ -528,8 +533,8 @@ onMounted(() => {
 }
 
 .setting-label {
-  font-size: 14px;
-  color: #333333;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-color, #333333);
 }
 
 .setting-value {
@@ -539,8 +544,8 @@ onMounted(() => {
 }
 
 .setting-value span {
-  font-size: 14px;
-  color: #999999;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-muted, #999999);
 }
 
 /* 主题背景选择 */
@@ -582,9 +587,23 @@ onMounted(() => {
 }
 
 .theme-name {
-  font-size: 12px;
-  color: #666666;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   display: block;
+}
+
+/* 平台能力提示（非 H5 端的动态换肤说明） */
+.platform-hint {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background-color: rgba(194, 151, 127, 0.1);
+  border-radius: 8px;
+}
+
+.platform-hint span {
+  font-size: calc(12px * var(--font-scale, 1));
+  line-height: 1.6;
+  color: #8a7a6d;
 }
 
 /* 主题选项按钮 */
@@ -595,11 +614,11 @@ onMounted(() => {
 
 .theme-btn {
   padding: 6px 12px;
-  border: 1px solid #D8C8BE;
+  border: 1px solid var(--border-color, #D8C8BE);
   border-radius: 16px;
-  background-color: white;
-  font-size: 12px;
-  color: #666666;
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -618,11 +637,11 @@ onMounted(() => {
 
 .font-btn {
   padding: 6px 12px;
-  border: 1px solid #D8C8BE;
+  border: 1px solid var(--border-color, #D8C8BE);
   border-radius: 16px;
-  background-color: white;
-  font-size: 12px;
-  color: #666666;
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -666,7 +685,7 @@ onMounted(() => {
   width: 18px;
   left: 3px;
   bottom: 3px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   transition: .4s;
   border-radius: 50%;
 }
@@ -686,12 +705,12 @@ input:checked + .switch-slider:before {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999999;
+  color: var(--text-muted, #999999);
 }
 
 .arrow-icon::before {
   content: ">";
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale, 1));
   font-weight: bold;
 }
 
@@ -744,7 +763,7 @@ input:checked + .switch-slider:before {
 }
 
 .modal-content {
-  background-color: #fff;
+  background-color: var(--surface-strong, #FFFFFF);
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   width: 90%;
@@ -763,13 +782,13 @@ input:checked + .switch-slider:before {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 500;
   color: #333;
 }
 
 .close-icon {
-  font-size: 28px;
+  font-size: calc(28px * var(--font-scale, 1));
   color: #999;
   line-height: 1;
 }
@@ -784,7 +803,7 @@ input:checked + .switch-slider:before {
 
 .form-item .label {
   display: block;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: #666;
   margin-bottom: 8px;
 }
@@ -797,11 +816,11 @@ input:checked + .switch-slider:before {
 
 .type-btn {
   padding: 8px 16px;
-  border: 1px solid #d8c8be;
+  border: 1px solid var(--border-color, #D8C8BE);
   border-radius: 20px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: #666;
-  background-color: #fff;
+  background-color: var(--surface-strong, #FFFFFF);
   transition: all 0.3s ease;
 }
 
@@ -814,9 +833,9 @@ input:checked + .switch-slider:before {
 .input-box {
   width: 100%;
   padding: 14px 12px;
-  border: 1px solid #d8c8be;
+  border: 1px solid var(--border-color, #D8C8BE);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: #333;
   background-color: #fafafa;
   box-sizing: border-box;
@@ -844,10 +863,10 @@ input:checked + .switch-slider:before {
 
 .cancel-btn {
   padding: 10px 24px;
-  border: 1px solid #d8c8be;
+  border: 1px solid var(--border-color, #D8C8BE);
   border-radius: 8px;
-  background-color: #fff;
-  font-size: 14px;
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: calc(14px * var(--font-scale, 1));
   color: #666;
 }
 
@@ -856,7 +875,7 @@ input:checked + .switch-slider:before {
   border: 1px solid #C2977F;
   border-radius: 8px;
   background-color: #C2977F;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: #fff;
 }
 

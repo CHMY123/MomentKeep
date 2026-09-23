@@ -25,17 +25,20 @@
             <view class="info-item">
               <view class="info-label">昵称</view>
               <view v-if="!isEditMode" class="info-value">{{ userInfo.nickname }}</view>
-              <input v-else type="text" :value="formData.nickname" @input="formData.nickname = $event.target.value" placeholder="请输入昵称" class="input-box" />
+              <!-- 小程序 / App 端的 input 事件对象是 {detail:{value}}，没有 event.target.value，
+                   必须用 v-model（同文件的密码框就是这么写的）；
+                   原写法在小程序端会把昵称写成 undefined，保存后资料被清空 -->
+              <input v-else type="text" v-model="formData.nickname" placeholder="请输入昵称" class="input-box" />
             </view>
             <view class="info-item">
               <view class="info-label">手机号</view>
               <view v-if="!isEditMode" class="info-value">{{ userInfo.phone }}</view>
-              <input v-else type="tel" :value="formData.phone" @input="formData.phone = $event.target.value" placeholder="请输入手机号" class="input-box" />
+              <input v-else type="tel" v-model="formData.phone" placeholder="请输入手机号" class="input-box" />
             </view>
             <view class="info-item">
               <view class="info-label">邮箱</view>
               <view v-if="!isEditMode" class="info-value">{{ userInfo.email }}</view>
-              <input v-else type="email" :value="formData.email" @input="formData.email = $event.target.value" placeholder="请输入邮箱" class="input-box" />
+              <input v-else type="text" v-model="formData.email" placeholder="请输入邮箱" class="input-box" />
             </view>
           </view>
           <button v-if="isEditMode" class="submit-btn" @click="updateProfile">保存修改</button>
@@ -182,7 +185,7 @@ const uploadAvatar = () => {
           }
         },
         fail: () => {
-          uni.showToast({ title: '网络错误，头像上传失败', icon: 'none' })
+          uni.showToast({ title: error.message || '网络错误，头像上传失败', icon: 'none' })
         }
       })
     }
@@ -209,7 +212,7 @@ const updateProfile = async () => {
       uni.showToast({ title: response.message || '资料更新失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误，资料更新失败', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误，资料更新失败', icon: 'none' })
   }
 }
 
@@ -223,7 +226,9 @@ const closeDeleteDialog = () => {
 
 const confirmDeleteAccount = async () => {
   try {
-    const response = await post('/user/delete', {}, {
+    // 后端 DeleteAccountDTO 的 confirmation 是必填（@NotNull）用于防误触，
+    // 此前前端发了空对象，导致注销接口一律返回 400
+    const response = await post('/user/delete', { confirmation: true }, {
       'Authorization': `Bearer ${userStore.getToken}`
     })
 
@@ -241,7 +246,7 @@ const confirmDeleteAccount = async () => {
       uni.showToast({ title: response.message || '账户注销失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误，账户注销失败', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误，账户注销失败', icon: 'none' })
   } finally {
     isDeleteDialogVisible.value = false
   }
@@ -273,9 +278,12 @@ const changePassword = async () => {
     return
   }
   try {
+    // 后端 ChangePasswordDTO 的 confirmPassword 为必填（@NotBlank），
+    // 此前请求体漏传该字段，改密接口一律返回 400
     const response = await post('/user/change-password', {
       oldPassword: passwordData.oldPassword,
-      newPassword: passwordData.newPassword
+      newPassword: passwordData.newPassword,
+      confirmPassword: passwordData.confirmPassword
     }, {
       'Authorization': `Bearer ${userStore.getToken}`
     })
@@ -287,7 +295,7 @@ const changePassword = async () => {
       uni.showToast({ title: response.message || '密码修改失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误，密码修改失败', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误，密码修改失败', icon: 'none' })
   }
 }
 

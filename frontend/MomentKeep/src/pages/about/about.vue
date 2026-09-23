@@ -23,15 +23,15 @@
           <span class="feature-title">核心功能</span>
           <div class="feature-list">
             <div class="feature-item">
-              <div class="feature-icon clock-icon"></div>
+              <div class="feature-icon icon-clock"></div>
               <span class="feature-text">每日打卡</span>
             </div>
             <div class="feature-item">
-              <div class="feature-icon todo-icon"></div>
+              <div class="feature-icon icon-todo"></div>
               <span class="feature-text">今日待办</span>
             </div>
             <div class="feature-item">
-              <div class="feature-icon time-icon"></div>
+              <div class="feature-icon icon-time"></div>
               <span class="feature-text">未来倒计时</span>
             </div>
             <div class="feature-item">
@@ -41,7 +41,22 @@
           </div>
         </div>
       </div>
-      
+
+      <!-- 法律条款：微信小程序审核要求隐私政策可在应用内独立查看，故在此提供入口 -->
+      <div class="legal-section">
+        <span class="section-title">法律条款</span>
+        <div class="legal-list">
+          <div class="legal-item" @click="goPrivacy">
+            <span class="legal-name">隐私政策</span>
+            <span class="legal-arrow">›</span>
+          </div>
+          <div class="legal-item" @click="goAgreement">
+            <span class="legal-name">用户协议</span>
+            <span class="legal-arrow">›</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 开发者信息 -->
       <div class="developer-section">
         <span class="section-title">贡献者</span>
@@ -102,6 +117,16 @@
 import { ref, onMounted } from 'vue'
 import Layout from '../../components/Layout.vue'
 
+/** 跳转到隐私政策页 */
+const goPrivacy = () => {
+  uni.navigateTo({ url: '/pages/privacy/privacy' })
+}
+
+/** 跳转到用户协议页 */
+const goAgreement = () => {
+  uni.navigateTo({ url: '/pages/agreement/agreement' })
+}
+
 // 处理图片加载错误
 const handleImageError = (event) => {
   // 如果图片加载失败，显示默认头像
@@ -130,7 +155,7 @@ onMounted(() => {
 
 /* 项目信息 */
 .about-section {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
@@ -149,7 +174,7 @@ onMounted(() => {
 }
 
 .app-name {
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   font-weight: 600;
   color: #C2977F;
   display: block;
@@ -157,8 +182,8 @@ onMounted(() => {
 }
 
 .app-slogan {
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   display: block;
 }
 
@@ -168,17 +193,17 @@ onMounted(() => {
 }
 
 .info-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin-bottom: 12px;
   border-bottom: 1px solid #94A7C8;
   padding-bottom: 8px;
 }
 
 .info-content {
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   line-height: 1.6;
 }
 
@@ -187,9 +212,9 @@ onMounted(() => {
 }
 
 .feature-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin-bottom: 16px;
   border-bottom: 1px solid #94A7C8;
   padding-bottom: 8px;
@@ -205,14 +230,14 @@ onMounted(() => {
   display: flex;
   align-items: center;
   padding: 12px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .feature-icon {
   margin-right: 12px;
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   width: 24px;
   height: 24px;
   display: flex;
@@ -220,54 +245,29 @@ onMounted(() => {
   justify-content: center;
 }
 
-.clock-icon::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/48/000000/clock.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-.todo-icon::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/48/000000/todo-list.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-.time-icon::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/48/000000/hourglass.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-.chat-icon::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  display: block;
-  background-image: url(https://img.icons8.com/color/48/000000/chat.png);
-  background-size: contain;
-  background-repeat: no-repeat;
+/*
+ * 功能图标统一来自全局 src/styles/icons.css（自绘 base64，无第三方 CDN）。
+ *
+ * 尺寸用"自定义属性继承"指定，而不是去覆盖 ::before 的 width/height：
+ * 全局图标规则是 .icon-clock::before 这类单类选择器，覆盖它必须加前缀提权，
+ * 很容易漏掉某个属性——此前就因此出现盒子 24 宽 × 32 高、
+ * 图片被 background-position 默认值贴到顶部，图标比文字中线高出约 4px 的错位。
+ * 变量声明在 .feature-icon 上会自然继承给子级 ::before，不会漏项。
+ *
+ * 同时让图标跟随字号缩放，避免调大字号后图标相对文字偏小。
+ */
+.feature-icon {
+  --icon-size-lg: calc(24px * var(--font-scale, 1));
 }
 
 .feature-text {
-  font-size: 14px;
-  color: #333333;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-color, #333333);
 }
 
 /* 开发者信息 */
 .developer-section {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
@@ -275,9 +275,9 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   margin-bottom: 16px;
   border-bottom: 1px solid #94A7C8;
   padding-bottom: 8px;
@@ -293,7 +293,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   padding: 12px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
@@ -305,7 +305,7 @@ onMounted(() => {
   overflow: hidden;
   margin-right: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  background-color: #F8F6F2;
+  background-color: var(--bg-color, #F8F6F2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -326,7 +326,7 @@ onMounted(() => {
   justify-content: center;
   background: linear-gradient(135deg, #C2977F 0%, #94A7C8 100%);
   color: white;
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   font-weight: 600;
 }
 
@@ -335,21 +335,21 @@ onMounted(() => {
 }
 
 .developer-name {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
   display: block;
   margin-bottom: 4px;
 }
 
 .developer-role {
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
 }
 
 /* 技术栈 */
 .tech-section {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
@@ -364,43 +364,43 @@ onMounted(() => {
 
 .tech-item {
   padding: 12px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .tech-name {
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   display: block;
   margin-bottom: 4px;
 }
 
 .tech-value {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 /* 版权信息 */
 .copyright-section {
   text-align: center;
   padding: 20px;
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .copyright {
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   display: block;
   margin-bottom: 8px;
 }
 
 .version {
-  font-size: 12px;
-  color: #999999;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted, #999999);
 }
 
 /* 响应式设计 */
@@ -422,5 +422,42 @@ onMounted(() => {
   .developer-avatar {
     margin-right: 0;
   }
+}
+/* 法律条款入口 */
+.legal-section {
+  margin-top: 16px;
+  /* 与下方"贡献者"拉开间距：此前没有底部外边距，而 .developer-section 也没有上边距，
+     两块卡片会完全贴合在一起（实测间距为 0px） */
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: var(--surface-color, #F2EEE8);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.legal-list {
+  margin-top: 8px;
+}
+
+.legal-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color-light, #E8E4DE);
+}
+
+.legal-item:last-child {
+  border-bottom: none;
+}
+
+.legal-name {
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-color, #333333);
+}
+
+.legal-arrow {
+  font-size: calc(16px * var(--font-scale, 1));
+  color: #bbbbbb;
 }
 </style>

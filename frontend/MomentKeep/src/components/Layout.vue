@@ -1,7 +1,7 @@
 <template>
   <div class="layout-container">
     <!-- 背景层 -->
-    <div class="background-layer" :style="currentBackgroundStyle"></div>
+    <div class="background-layer" :class="{ 'has-custom-bg': !!currentBackgroundStyle.backgroundImage }" :style="currentBackgroundStyle"></div>
     
     <!-- 侧边栏遮罩层 -->
     <div 
@@ -20,7 +20,7 @@
       @touchend="handleSidebarTouchEnd"
     >
       <div class="user-info">
-        <div class="avatar" @click="navigateToProfile" :style="{ backgroundImage: `url(${userAvatar})` }"></div>
+        <div class="avatar" @click="navigateToProfile" :style="{ backgroundImage: toCssUrl(userAvatar) }"></div>
         <div class="user-name">{{ userName }}</div>
       </div>
       
@@ -105,7 +105,7 @@
           </div>
         </div>
         <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.type === 'user' ? 'ai-message-user' : 'ai-message-bot'">
-          <div v-if="message.type === 'user'" class="ai-avatar" :style="{ backgroundImage: `url(${userAvatar || 'https://momentkeep.s3.bitiful.net/avatars/logo.png'})` }"></div>
+          <div v-if="message.type === 'user'" class="ai-avatar" :style="{ backgroundImage: toCssUrl(userAvatar || 'https://momentkeep.s3.bitiful.net/avatars/logo.png') }"></div>
           <div v-else class="ai-avatar" :style="{ backgroundImage: `url('https://momentkeep.s3.bitiful.net/avatars/AI%20assistant.png')` }"></div>
           <div class="ai-message-content">
             <div v-if="message.loading" class="loading-indicator">
@@ -142,10 +142,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../store/user'
 import { useAppStore } from '../store/app'
-import { post, get } from '../utils/request'
+import { post, get, toCssUrl } from '../utils/request'
 import { useCache } from '../utils/cache'
 // H5 专用：Markdown 渲染与消毒。小程序 / App 端不支持 v-html，无需引入这两个包
 // #ifdef H5
@@ -213,29 +213,49 @@ const updateBackgroundStyle = () => {
 
     if (bgImage) {
       currentBackgroundStyle.value = {
-        backgroundImage: `url(${bgImage})`,
+        backgroundImage: toCssUrl(bgImage),
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       }
     } else {
-      // 添加默认背景色，避免微信小程序中背景变成纯白
+      // 添加默认背景色，避免微信小程序中背景变成纯白。
+      // 【必须用主题变量】这里是内联样式，优先级高于所有样式表规则：
+      // 写死浅米色会让它盖住深色主题的页面底色（实测深色下内容区约 43% 的像素仍是这个浅色）。
+      // 变量取不到时（小程序 / App 端不换肤）兜底值仍是原本的浅米色。
       currentBackgroundStyle.value = {
-        backgroundColor: '#F2EEE8'
+        backgroundColor: 'var(--surface-color, #F2EEE8)'
       }
     }
   } catch (e) {
     console.error('读取背景设置失败:', e)
-    // 出错时也添加默认背景色
+    // 出错时也添加默认背景色（同样用主题变量，理由见上）
     currentBackgroundStyle.value = {
-      backgroundColor: '#F2EEE8'
+      backgroundColor: 'var(--surface-color, #F2EEE8)'
     }
   }
 }
 
 updateBackgroundStyle()
 
+/**
+ * 用户信息中的背景图一旦变化就立即重新应用。
+ *
+ * @description 原先只在 setup 与 onMounted 里各读一次本地缓存，而 onMounted 中的
+ * 读取发生在 await 拉取用户资料之前，拿到资料后不再刷新，
+ * 因此登录后背景图要等组件重挂载（切页）或刷新才出现。
+ * 这里监听 store 而非 storage：所有写入路径（登录、拉资料、改资料）都会经过 setUserInfo，
+ * 而 setUserInfo 是先同步写 storage 再触发响应式更新，所以这里读到的缓存值一定是最新的。
+ */
+watch(() => userStore.getUserInfo.backgroundImage, () => {
+  updateBackgroundStyle()
+})
+
+// 侧边栏头像（模板直接引用该 setup 绑定）。
+// 注意：此声明一旦缺失，模板会退化为读取实例属性（undefined），
+// 表现为头像空白，并在控制台报 "Property userAvatar was accessed during render but is not defined"。
 const userAvatar = computed(() => userStore.getUserInfo.avatar || 'https://img.icons8.com/ios-filled/50/000000/user.png')
+
 const userName = computed(() => userStore.getUserInfo.nickname || userStore.getUserInfo.username || '用户')
 
 // 菜单配置
@@ -515,15 +535,23 @@ const checkMobile = () => {
 
 // 处理背景更新事件
 const handleBackgroundUpdate = (event) => {
-  const { type, image } = event.detail
+  const { type, image } = event.detail || {}
+
   if (type === 'custom' && image) {
     currentBackgroundStyle.value = {
-      backgroundImage: `url(${image})`,
+      backgroundImage: toCssUrl(image),
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat'
     }
     uni.setStorageSync('backgroundImage', image)
+    return
+  }
+
+  // 恢复默认背景：以存储为准重新计算，避免残留旧背景图
+  if (type === 'default') {
+    uni.removeStorageSync('backgroundImage')
+    updateBackgroundStyle()
   }
 }
 
@@ -534,10 +562,28 @@ const handleThemeUpdate = (event) => {
 
 // 生命周期
 onMounted(async () => {
+  // ⚠️ 顺序至关重要：布局判定与页面标题必须在任何 await 之前同步完成。
+  // 侧边栏切换用的是 uni.reLaunch，它会销毁重建页面（Layout 随之重建），
+  // 若这两步排在 await 拉取用户资料之后，每次切页都要等这个网络请求返回
+  // 才把标题从"朝暮记"改成页面名、把布局切成移动端形态 ——
+  // 用户会先看到几百毫秒的中间态（桌面版布局 + 应用名标题），切页一多就很疲劳。
+  checkMobile()
+  // 标题与侧边栏高亮：立即尝试，并在页面栈尚未就绪时自动重试（见 syncPageTitle 注释）
+  syncPageTitle()
+
   updateBackgroundStyle()
   userStore.initUserInfo()
 
-  if (userStore.getToken) {
+  // 事件监听同样不应受网络影响
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', checkMobile)
+    window.addEventListener('background-updated', handleBackgroundUpdate)
+    window.addEventListener('theme-updated', handleThemeUpdate)
+  }
+
+  // 资料刷新放到最后、纯后台进行，不阻塞首帧。
+  // 本地已有用户资料时跳过请求：否则每次切页都要多打一次 /user/profile。
+  if (userStore.getToken && !userStore.getUserInfo.id) {
     try {
       const response = await get('/user/profile', {}, {
         'Authorization': `Bearer ${userStore.getToken}`
@@ -550,18 +596,12 @@ onMounted(async () => {
       console.error('获取用户信息失败:', error)
     }
   }
-
-  checkMobile()
-  updateActiveMenu() // 直接调用，不延迟
-
-  // 只在浏览器环境中添加事件监听器
-  if (typeof window !== 'undefined') {
-    window.addEventListener('resize', checkMobile)
-    window.addEventListener('background-updated', handleBackgroundUpdate)
-    window.addEventListener('theme-updated', handleThemeUpdate)
-  }
 })
 
+/**
+ * 依据当前页面栈校准页面标题与侧边栏高亮
+ * @returns {boolean} 是否成功匹配到当前页面
+ */
 const updateActiveMenu = () => {
   try {
     const pages = getCurrentPages()
@@ -574,12 +614,43 @@ const updateActiveMenu = () => {
         if (menuItem) {
           currentPageTitle.value = menuItem.name
           appStore.setActiveMenu(menuItem.id)
+          return true
         }
       }
     }
   } catch (error) {
     console.error('获取当前页面路径失败:', error)
   }
+  return false
+}
+
+/** 标题校准重试定时器（组件销毁时需清理） */
+let titleRetryTimer = null
+
+/**
+ * 校准标题与侧边栏高亮（带重试）
+ *
+ * @description 导航过程中 getCurrentPages() 存在短暂空窗期：实测 uni.reLaunch 切换页面后
+ * 约 70ms 内该数组为空，之后才指向新页面（先关闭旧页面、再挂载新页面）。
+ * 若只在 onMounted 里调用一次，恰好落进这个窗口就会匹配失败，
+ * 而没有任何后续时机再纠正它，标题便会一直停在初始值「朝暮记」——
+ * 各页面挂载时机不同，所以只有首页、每日打卡这类较重页面会偶发中招。
+ * 因此改为：立即尝试，未命中则按递增间隔重试，命中即停。
+ *
+ * @param {number} [attempt] 当前重试轮次（递归内部使用）
+ */
+const syncPageTitle = (attempt = 0) => {
+  if (updateActiveMenu()) return
+
+  // 间隔贴近实测空窗期（约 75ms）：早于该窗口的重试注定失败，故先密后疏
+  const retryDelays = [0, 30, 80, 150, 400, 900]
+  if (attempt >= retryDelays.length) return
+
+  if (titleRetryTimer) clearTimeout(titleRetryTimer)
+  titleRetryTimer = setTimeout(() => {
+    titleRetryTimer = null
+    syncPageTitle(attempt + 1)
+  }, retryDelays[attempt])
 }
 
 onUnmounted(() => {
@@ -587,6 +658,12 @@ onUnmounted(() => {
   if (typingTimer) {
     clearInterval(typingTimer)
     typingTimer = null
+  }
+
+  // 清理标题重试定时器
+  if (titleRetryTimer) {
+    clearTimeout(titleRetryTimer)
+    titleRetryTimer = null
   }
 
   // 移除窗口大小监听
@@ -604,10 +681,10 @@ onUnmounted(() => {
   display: flex;
   height: 100vh;
   position: relative;
-  color: #333333;
+  color: var(--text-color, #333333);
   transition: all 0.3s ease;
   overflow: hidden;
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
 }
 
 /* 背景层 */
@@ -620,10 +697,29 @@ onUnmounted(() => {
   z-index: 0;
   filter: blur(8px);
   transition: background-image 0.3s ease, opacity 0.3s ease;
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+/*
+ * 自定义背景图之上的柔和遮罩。
+ *
+ * 为什么需要：页面上有一部分文字直接压在背景上（欢迎语、区块标题、"查看全部"等），
+ * 一旦用户设置了色彩丰富的自定义背景图，这些文字与卡片边缘都会难以辨认
+ * （实测卡片本身是不透明的，问题出在压在图上的文字对比度）。
+ * 该遮罩在保留背景图观感的前提下把对比度拉回来；只在设置了自定义背景时生效，
+ * 默认的纯色背景不受影响。
+ */
+.background-layer.has-custom-bg::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(248, 246, 242, 0.62);
 }
 
 /* 确保内容层在背景之上 */
@@ -739,7 +835,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 2px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   transition: all 0.3s ease;
 }
 
@@ -752,7 +848,7 @@ onUnmounted(() => {
 }
 
 .hamburger-icon {
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   height: 2px;
   width: 20px;
   position: relative;
@@ -765,7 +861,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 2px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
 }
 
 .hamburger-icon::after {
@@ -775,7 +871,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 2px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
 }
 
 .user-info {
@@ -793,7 +889,11 @@ onUnmounted(() => {
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   background-color: #f0f0f0;
-  background-size: contain;
+  /* 必须用 cover：圆形头像若用 contain，图片非正方形时会在上下（或左右）
+     留出空隙，露出下面的 background-color，表现为贴合不自然的浅色"白边"。
+     cover 会等比放大到铺满并裁掉溢出部分，配合 overflow: hidden 正好被圆形裁切。
+     资料页的 <image> 用的就是 object-fit: cover，两侧保持一致。 */
+  background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   display: flex;
@@ -803,7 +903,7 @@ onUnmounted(() => {
 }
 
 .user-name {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-color, #333333);
 }
@@ -833,7 +933,7 @@ onUnmounted(() => {
 
 .menu-icon {
   margin-right: 12px;
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale, 1));
   transition: color 0.3s ease;
   width: 24px;
   height: 24px;
@@ -936,7 +1036,7 @@ onUnmounted(() => {
 
 /* 聊天图标 */
 .chat-icon {
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   width: 24px;
   height: 24px;
   display: flex;
@@ -985,7 +1085,7 @@ onUnmounted(() => {
 
 .header-title {
   flex: 1;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--primary-color, #C2977F);
 }
@@ -996,7 +1096,7 @@ onUnmounted(() => {
 }
 
 .chat-icon {
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
 }
 
 .page-content {
@@ -1019,7 +1119,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   z-index: 100;
-  color: #333333;
+  color: var(--text-color, #333333);
   box-sizing: border-box;
   padding-bottom: 0;
 }
@@ -1038,21 +1138,21 @@ onUnmounted(() => {
 }
 
 .ai-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .ai-quota {
-  font-size: 12px;
-  color: #999999;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted, #999999);
   margin-left: 8px;
   margin-right: auto;
 }
 
 .close-icon {
   cursor: pointer;
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
 }
 
 .ai-content {
@@ -1084,7 +1184,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 500;
   margin: 0 8px;
 }
@@ -1096,7 +1196,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background-size: contain;
+  /* 头像统一用 cover，避免非正方形图片在圆形内留出空隙露出底色 */
+  background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 }
@@ -1115,7 +1216,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-size: contain;
+  /* 此处显示的是用户头像，同样需要 cover 才能铺满圆形 */
+  background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 }
@@ -1124,9 +1226,9 @@ onUnmounted(() => {
   max-width: 70%;
   padding: 10px 14px;
   border-radius: 16px;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  color: #333333;
+  color: var(--text-color, #333333);
   align-self: flex-start;
   word-wrap: break-word;
 }
@@ -1192,15 +1294,15 @@ onUnmounted(() => {
 }
 
 .markdown-content h1 {
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
 }
 
 .markdown-content h2 {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
 }
 
 .markdown-content h3 {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
 }
 
 .markdown-content p {
@@ -1228,7 +1330,7 @@ onUnmounted(() => {
   background-color: rgba(0, 0, 0, 0.05);
   padding: 2px 4px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-family: monospace;
 }
 
@@ -1243,7 +1345,7 @@ onUnmounted(() => {
 .markdown-content pre code {
   background-color: transparent;
   padding: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
 }
 
 .markdown-content a {
@@ -1294,11 +1396,11 @@ onUnmounted(() => {
   width: 100%;
   height: 44px;
   padding: 0 14px;
-  border: 1px solid #D8C8BE;
+  border: 1px solid var(--border-color, #D8C8BE);
   border-radius: 22px;
-  background-color: white;
-  font-size: 14px;
-  color: #333333;
+  background-color: var(--surface-strong, #FFFFFF);
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-color, #333333);
   outline: none;
   box-sizing: border-box;
 }
@@ -1315,7 +1417,7 @@ onUnmounted(() => {
   color: white;
   border: none;
   border-radius: 22px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;

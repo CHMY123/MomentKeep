@@ -46,7 +46,11 @@
               <span class="countdown-date">{{ countdown.date }}</span>
             </div>
           </div>
-          <div v-if="countdowns.length === 0" class="empty-countdown">
+          <!-- 加载期间先显示加载态，避免先闪"暂无倒计时"再跳出列表 -->
+          <div v-if="!dataReady" class="empty-countdown">
+            <span>正在加载…</span>
+          </div>
+          <div v-else-if="countdowns.length === 0" class="empty-countdown">
             <span>暂无倒计时</span>
           </div>
         </div>
@@ -60,18 +64,18 @@
         <div class="stats-grid">
           <div class="stat-item">
             <span class="stat-value stat-icon" :class="{ 'checked': checkinStats.early }">
-              {{ checkinStats.early ? '√' : '×' }}
+              {{ dataReady ? (checkinStats.early ? '√' : '×') : '—' }}
             </span>
             <span class="stat-label">早起打卡</span>
           </div>
           <div class="stat-item">
             <span class="stat-value stat-icon" :class="{ 'checked': checkinStats.sleep }">
-              {{ checkinStats.sleep ? '√' : '×' }}
+              {{ dataReady ? (checkinStats.sleep ? '√' : '×') : '—' }}
             </span>
             <span class="stat-label">睡眠打卡</span>
           </div>
           <div class="stat-item">
-            <span class="stat-value stat-number">{{ checkinStats.meal }}</span>
+            <span class="stat-value stat-number">{{ dataReady ? checkinStats.meal : '—' }}</span>
             <span class="stat-label">用餐次数</span>
           </div>
           <div class="stat-item">
@@ -116,6 +120,15 @@ const checkinStats = ref({
 
 // 加载状态
 const loading = ref(false)
+
+/**
+ * 首屏数据是否已就绪
+ *
+ * @description 用于在初次加载期间隐藏"暂无倒计时 / 0 次 / ×"这类误导性状态：
+ * 否则会先渲染空态与全 0 统计，等接口返回后整块跳变成真实数据，
+ * 每次切页都跳一次，观感上像是"页面自己纠错"。
+ */
+const dataReady = ref(false)
 
 /**
  * 跳转到指定页面
@@ -205,7 +218,7 @@ const fetchCheckinStats = async () => {
 
   try {
     const checkinList = await fetchFn()
-    console.log('打卡数据:', checkinList)
+
     setCache(cacheKey, checkinList)
 
     checkinStats.value = {
@@ -268,12 +281,17 @@ const fetchCheckinStats = async () => {
 onMounted(async () => {
   // 检查是否登录
   if (!userStore.getToken) {
+    dataReady.value = true
     return
   }
 
-  // 初始化数据
-  await fetchCountdowns()
-  await fetchCheckinStats()
+  // 初始化数据：全部结束后再撤下加载态
+  try {
+    await fetchCountdowns()
+    await fetchCheckinStats()
+  } finally {
+    dataReady.value = true
+  }
 })
 </script>
 
@@ -335,62 +353,7 @@ onMounted(async () => {
   justify-content: center;
 }
 
-/* 图标样式 */
-.icon-clock::before {
-  content: "🕒";
-}
-
-.icon-todo::before {
-  content: "";
-  width: 32px;
-  height: 32px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/96/000000/todo-list.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-.icon-time::before {
-  content: "";
-  width: 32px;
-  height: 32px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/96/000000/hourglass.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-/* 统计图标 */
-.icon-sunny::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/48/000000/sun.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-.icon-moon::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/48/000000/moon.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-.icon-run::before {
-  content: "";
-  width: 24px;
-  height: 24px;
-  display: inline-block;
-  background-image: url(https://img.icons8.com/color/48/000000/running.png);
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
+/* 图标样式已迁到全局 src/styles/icons.css（自绘 base64 PNG，不再依赖第三方 CDN） */
 .stat-icon {
   display: flex;
   align-items: center;

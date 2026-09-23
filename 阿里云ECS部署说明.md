@@ -3,7 +3,72 @@
 > 适用配置：阿里云 ECS **2 vCPU / 2 GiB 内存 / Alibaba Cloud Linux 3.2104 LTS 64 位**
 > 部署方案：**方案 A —— 数据库继续使用 TiDB Cloud**，对象存储继续使用缤纷云，ECS 只承载 Nginx + Spring Boot 应用。
 > 覆盖平台：**H5（Web）/ 微信小程序 / App（Android·iOS）**
-> 文档更新：2026-09-18
+> 文档更新：**2026-09-19**（本次同步了生产 profile 内置、依赖变更、索引落地、真机运行修复等内容）
+
+---
+
+## 零、通过域名访问：从零到可访问（只想要结论就看这一节）
+
+### 0.1 先明确「用哪个域名访问什么」
+
+| 访问目标 | 地址形态 | 说明 |
+|---|---|---|
+| H5（浏览器） | `https://你的域名/` | Nginx 直接返回 `dist/build/h5` 下的静态文件 |
+| H5 调接口 | `https://你的域名/api/...` | 与页面**同域**，Nginx 反代到 `127.0.0.1:8080` → **天然没有跨域** |
+| 微信小程序 | `https://你的域名/api/...` | 需在微信后台配成 **request 合法域名**（必须 HTTPS + 已备案） |
+| App | `https://你的域名/api/...` | 由 `.env.production` 的 `VITE_API_BASE_URL_APP` 注入 |
+
+**强烈建议只用一个域名**同时承载页面与接口：一张证书、一处备案、H5 无跨域。
+若确实要拆成 `www.`（页面）+ `api.`（接口），H5 就必须再配 `CORS_ALLOWED_ORIGINS`，否则浏览器会拦掉请求。
+
+### 0.2 七步执行顺序
+
+| 步骤 | 做什么 | 位置 | 详见 |
+|---|---|---|---|
+| 1 | 域名实名认证 + **ICP 备案**（大陆节点强制，通常 3–20 天，**先启动这一步**） | 阿里云控制台 → 备案 | §2.1 |
+| 2 | 域名解析：A 记录指向 ECS 公网 IP | 云解析 DNS | §2.1 |
+| 3 | 安全组只放行 22（限你的源 IP）/ 80 / 443，**不要开 8080** | ECS → 安全组 | §2.2 |
+| 4 | ECS 初始化：时区、Swap、JDK、Nginx、目录、运维用户 | 服务器 | §2.3 / §2.4 |
+| 5 | 申请证书，把 `pem` / `key` 放到 `/etc/nginx/ssl/` | 阿里云免费证书 或 acme.sh | §5.2 |
+| 6 | 部署后端：上传 jar + 环境变量文件 + systemd（监听 `127.0.0.1:8080`） | 服务器 | 第四章 |
+| 7 | 部署 H5：本地构建 → 上传到 `/opt/momentkeep/web` → 写 Nginx 配置 → `reload` | 本地 + 服务器 | §5.1 / 第六章 |
+
+### 0.3 占位符替换清单（最容易漏，逐条打勾）
+
+本文档与配置中的 `api.example.com` 全部要换成你的真实域名：
+
+- [ ] `/etc/nginx/conf.d/momentkeep.conf` → **两处** `server_name`（80 与 443 各一处）
+- [ ] `/etc/momentkeep/momentkeep.env` → `CORS_ALLOWED_ORIGINS`（同域部署可留空）
+- [ ] `frontend/MomentKeep/.env.production` → `VITE_API_BASE_URL_MP`、`VITE_API_BASE_URL_APP`（H5 保持 `/api` 不变）
+- [ ] `acme.sh --issue -d 你的域名`（若用方案二签证书）
+- [ ] 微信公众平台 → 开发管理 → 开发设置 → **request 合法域名**：只填 `https://你的域名`（**不要带 `/api` 路径**）
+- [ ] TiDB Cloud → 网络白名单：加入 **ECS 的公网 IP**
+
+### 0.4 验收：3 条命令 + 2 个浏览器动作
+
+```bash
+# 1) 后端本机活着（应输出 {"status":"UP"}）
+curl -fsS http://127.0.0.1:8080/actuator/health
+
+# 2) HTTPS 与证书链正常（应返回 HTTP/2 200，且无证书告警）
+curl -fsSI https://你的域名/ | head -1
+
+# 3) 反代确实通到了后端：预期 HTTP 400 + {"code":400,"message":"用户名或密码错误"}
+curl -s -o - -w '\nHTTP %{http_code}\n' https://你的域名/api/user/login \
+     -X POST -H 'Content-Type: application/json' \
+     -d '{"username":"notexist","password":"wrong"}'
+```
+
+浏览器里：
+
+1. 打开 `https://你的域名/` → 出现登录页；F12 → Network 看 `/api/user/login` 返回 200/400（**不是 502 / 504 / CORS 报错**）。
+2. 直接访问 `https://你的域名/pages/index/index` 后**刷新** → **不能 404**（`try_files $uri $uri/ /index.html` 生效，SPA history 路由）。
+
+### 0.5 三个必踩的坑
+
+1. **备案没通过前，大陆节点的 80/443 会被阿里云拦截**。想提前验证链路，可先把 `server_name` 临时改成 `_` 并用 `http://<ECS_IP>` 访问；但**小程序无法跳过备案**。
+2. **HTTP 会 301 跳到 HTTPS**，所以小程序里的接口地址必须是 `https://`，写 `http://` 一定失败。
+3. **上传体积三层必须对齐**：Nginx `client_max_body_size 12m` ≥ Spring `multipart.max-file-size 10MB` ≥ 业务层 5MB，任一层偏小都会在传头像/背景时得到 413。
 
 ---
 
@@ -266,27 +331,32 @@ systemctl status momentkeep
 journalctl -u momentkeep -f
 ```
 
-### 4.4 生产 profile（可选，推荐）
+### 4.4 生产 profile（仓库已内置，无需手工创建）
 
-仓库 `.gitignore` 已忽略 `application-prod.yml`，请**只在服务器上**创建 `/opt/momentkeep/current/application-prod.yml`：
+`src/main/resources/application-prod.yml` **已随仓库提供，并且会打进 jar**，内容如下（不含任何密钥）：
 
 ```yaml
+springdoc:
+  # 生产关闭接口文档：否则 /v3/api-docs 与 /swagger-ui 会暴露全部接口与 DTO 结构
+  api-docs:   { enabled: false }
+  swagger-ui: { enabled: false }
 server:
-  address: 127.0.0.1        # 只允许 Nginx 访问，杜绝绕过
-  port: 8080
+  # address: 127.0.0.1      # 配了 Nginx 再打开：杜绝绕过 Nginx 直连 8080
   tomcat:
-    threads:
-      max: 100
-      min-spare: 10
+    threads:      { max: 100, min-spare: 10 }
     accept-count: 100
-spring:
-  jpa:                      # 该段在本项目中无实际作用（未引入 JPA），保留仅为兼容
-    show-sql: false
 logging:
-  level:
-    root: info
-    cn.edu.scnu.momentkeep: info
+  file: { name: /opt/momentkeep/logs/app.log }
+  logback:
+    rollingpolicy: { max-file-size: 20MB, max-history: 7, total-size-cap: 500MB }
 ```
+
+启动时带 `--spring.profiles.active=prod` 即生效（systemd 与 Dockerfile 中已包含），**不需要**再在服务器上创建这个文件。
+如需临时覆盖，放到 `/opt/momentkeep/current/application-prod.yml` 即可（外部配置优先级高于 jar 内）。
+
+> 变更说明：早期版本这里让服务器手工创建该文件，且示例里带了 `spring.jpa.show-sql`。
+> 本项目**未引入 JPA**，该段起不到任何作用，已移除；现在 Swagger 的开关由 jar 内的 profile 文件统一控制。
+> `/actuator/health` 的暴露范围由 `application.yml` 的 `management.endpoints.web.exposure.include: health,info` 决定，只开这两个端点。
 
 ### 4.5 本地开发与生产配置的分工（重要）
 
@@ -444,15 +514,28 @@ curl https://get.acme.sh | sh -s email=you@example.com
 
 ### 6.1 构建（本地执行）
 
+**第 0 步：安装依赖**。项目存在 peer 依赖冲突（`vue` 被钉在 `3.4.21`，而 `@dcloudio/*` 版本要求更高的 Vue），
+**不带参数会直接报 ERESOLVE 失败**：
+
 ```bash
 cd frontend/MomentKeep
-# 1) 先确认真实域名已写入 .env.production
+npm install --legacy-peer-deps      # 或 npm ci --legacy-peer-deps（干净拉取时）
+```
+
+**第 1 步：确认域名已写入 `.env.production`**，然后构建：
+
+```bash
 #    VITE_API_BASE_URL=/api                    ← H5 与后端同域，走 Nginx 反代，无跨域
-#    VITE_API_BASE_URL_MP=https://api.example.com/api
-#    VITE_API_BASE_URL_APP=https://api.example.com/api
+#    VITE_API_BASE_URL_MP=https://你的域名/api   ← 必须 HTTPS 且已备案
+#    VITE_API_BASE_URL_APP=https://你的域名/api
 npm run build:h5
 # 产物目录：dist/build/h5/   （index.html + assets/ + static/）
 ```
+
+> ⚠️ **部署位置限制**：`vite.config.js` 未设置 `base`，因此 H5 **只能部署在域名根路径**（`https://你的域名/`）。
+> 若想挂在子路径（如 `/app/`），需先在 `vite.config.js` 加 `base: '/app/'` 并重新构建，同时调整 Nginx 的 `root`/`location`。
+
+> ⚠️ 必须使用 `uni build`（脚本已修正）。若直接 `vite build`，产物会错落到 `dist/` 根目录，导致 Nginx 指向的目录里没有 `index.html`。
 
 > ⚠️ 必须使用 `uni build`（脚本已修正）。若直接 `vite build`，产物会错落到 `dist/` 根目录，导致 Nginx 指向的目录里没有 `index.html`。
 
@@ -549,13 +632,36 @@ npm run build:mp-weixin
 
 ## 八、App 端上线（Android / iOS）
 
-### 8.1 打包方式选型
+### 8.1 前置条件：必须安装 App 平台运行时（否则只能停在基座欢迎页）
+
+CLI 工程的 App 端依赖 **`@dcloudio/uni-app-plus`**（官方模板默认包含）。若缺失，`uni -p app` 会**静默退化成网页构建**：
+产物目录里只有 `index.html` + `assets/*.js`，**没有 `app-service.js`** → 手机上的 HBuilderX 基座拿不到可运行资源，
+就会一直停在「HBuilderX真机运行 / 本应用无法独立运行」那一页，**即使 HBuilderX 日志显示"编译成功、同步文件成功"**。
+
+```bash
+cd frontend/MomentKeep
+# 版本号必须与 package.json 中其它 @dcloudio/* 包完全一致
+npm i @dcloudio/uni-app-plus@<与 package.json 一致的版本号> --legacy-peer-deps
+```
+
+**自检**：`npm run build:app` 之后，`dist/build/app/` 下**必须**同时存在：
+
+```
+app-service.js        ← App 运行时代码（缺失即代表该依赖没装好）
+app-config.js
+app-config-service.js
+app.css
+manifest.json
+uni-app-view.umd.js
+```
+
+### 8.2 打包方式选型
 
 | 方式 | 适用 | 说明 |
 |---|---|---|
 | **HBuilderX 云打包** | 推荐（学生项目） | 无需配置 Android Studio / Xcode，按次免费额度足够 |
 | HBuilderX 本地打包 | 需要自定义原生插件 | 需要 Android SDK / Xcode 环境 |
-| `npm run build:app` + 本地工程 | 有原生开发能力 | 产物在 `dist/build/app/`，再用原生日志工程打包 |
+| `npm run build:app` + 本地工程 | 有原生开发能力 | 产物在 `dist/build/app/`，再用原生工程打包 |
 
 ```bash
 cd frontend/MomentKeep
@@ -563,7 +669,7 @@ npm run build:app
 # 产物目录：dist/build/app/
 ```
 
-### 8.2 上线前必须完成的配置
+### 8.3 上线前必须完成的配置
 
 `src/manifest.json`：
 
@@ -577,11 +683,26 @@ npm run build:app
 4. **iOS 配置**：`ios: {}` 为空，需补 Bundle ID、隐私描述（相册/相机用途说明）、UILaunchStoryboardName 等。
 5. **接口地址**：由 `.env.production` 的 `VITE_API_BASE_URL_APP` 注入，必须为 HTTPS 域名。
 
-### 8.3 上传应用市场
+### 8.4 上传应用市场
 
 - **Android**：华为/小米/OPPO/vivo/应用宝等，需提供软著或备案信息（各市场要求不同），多数需要《计算机软件著作权登记证书》。
 - **iOS**：需 Apple Developer 账号（$99/年），在 App Store Connect 创建应用后用 Xcode/Transporter 上传 ipa；审核会检查隐私清单与权限说明。
 - 学生项目若不想上架，可用 **HBuilderX 生成 APK 自行分发**（Android 直接安装），iOS 用 TestFlight 或开发者证书装机。
+
+### 8.5 真机调试：一直停在基座欢迎页怎么办
+
+按出现概率从高到低排查：
+
+| # | 检查项 | 处理 |
+|---|---|---|
+| 1 | 有没有装 `@dcloudio/uni-app-plus`、`dist/build/app/app-service.js` 存不存在 | 见 §8.1。**这是本项目实际踩到的原因**：依赖缺失时 HBuilderX 日志照样显示"编译成功、同步文件成功"，但基座拿不到 App 资源 |
+| 2 | **基座版本与编译器版本是否匹配** | `@dcloudio/*` 版本号里带 HBuilderX 版本与渠道（如 `3.0.0-5020620260917001` ≈ HBuilderX 5.2.6 alpha 渠道、2026-09-17）。HBuilderX 版本低于它时基座不认识产物 → 升级 HBuilderX，或把 `@dcloudio/*` 整体降到与你的 HBuilderX 版本一致的**正式版** |
+| 3 | 手机端基座有没有**存储/文件权限**（Android 10+） | 缺权限时同步属于"假成功"。到系统设置里给 HBuilderX 基座开权限，再**彻底杀掉基座进程**重新运行 |
+| 4 | 基座缓存了上一次的项目 | 手机上清除基座数据或卸载重装基座 |
+| 5 | 手机与电脑不在同一网段 | 基座靠局域网连 HBuilderX，跨网段必然失败（日志会卡在"正在建立手机连接"） |
+
+> **判定要点**：先看 `dist/build/app/` 里有没有 `app-service.js`。
+> 有 → 问题在基座/版本/权限（第 2~5 条）；没有 → 问题在项目依赖，先按 §8.1 处理。
 
 ---
 
@@ -708,20 +829,25 @@ ls -1dt /opt/momentkeep/releases/*/ | tail -n +4 | xargs -r rm -rf
 
 ### 后端
 
-- [ ] `sql/upgrade_2026-09-18.sql` 已在 TiDB Cloud 执行（`user.token_version`、`ai_chat_quota`）
-- [ ] `JWT_SECRET_KEY` 为 48 位以上随机串，且与本地开发环境不同
-- [ ] `CORS_ALLOWED_ORIGINS` 已改为正式域名
-- [ ] 环境变量文件权限为 `600`，属主 `root:momentkeep`
-- [ ] `server.address=127.0.0.1`，安全组未放行 8080
+- [x] `sql/upgrade_2026-09-18.sql` 已在 TiDB Cloud 执行（`user.token_version`、`ai_chat_quota`）
+- [x] 索引已落地：`todo(user_id,completed)`、`focus_record(user_id,start_time)`、`ai_chat(user_id,create_time)`、`user_setting` 唯一键
+- [ ] 清理重复索引（可选，减少写入开销）：`checkin.idx_checkin_user_time` 与原有 `idx_user_time` 完全重复、`countdown.idx_countdown_user` 与原有 `idx_user_target` 完全重复
+- [x] 仓库内明文密钥文件 `backend/MomentKeep/src/main/resources/.env` 已删除（它会被打进 jar，且 Spring 从不读取它）
+- [ ] `/etc/momentkeep/momentkeep.env` 已按 §4.2 生成，权限 `600`、属主 `root:momentkeep`，且**取值与本地 `config/application-local.yml` 不同**
+- [ ] `JWT_SECRET_KEY` 为 48 位以上随机串（`openssl rand -base64 48`），且与本地开发环境不同
+- [ ] `CORS_ALLOWED_ORIGINS` 已改为正式域名（**H5 与接口同域时可留空**）
+- [ ] `server.address=127.0.0.1`（`application-prod.yml` 中取消注释），安全组未放行 8080
 - [ ] `AI_DAILY_LIMIT=3`、`AI_GLOBAL_DAILY_LIMIT` 已按预算设置
-- [ ] `/actuator/health` 本机可达、公网不可达
-- [ ] `/swagger-ui`、`/v3/api-docs` 在生产返回 404
-- [ ] 所有历史泄漏的凭据（TiDB 密码 / DeepSeek Key / S3 AK-SK / JWT Secret）**已轮换**
+- [ ] `/actuator/health` 本机可达、公网不可达（Nginx 已 `allow 127.0.0.1; deny all;`）
+- [ ] `/swagger-ui`、`/v3/api-docs` 在生产返回 404（由 `application-prod.yml` 的 `springdoc.*.enabled: false` 保证）
+- [ ] 所有历史泄漏的凭据（TiDB 密码 / DeepSeek Key / S3 AK-SK / JWT Secret）**已在各自控制台轮换**
 
 ### 前端·H5
 
+- [ ] 依赖已装：`npm install --legacy-peer-deps`（不带参数会因 peer 冲突报 ERESOLVE）
 - [ ] `npm run build:h5` 产物在 `dist/build/h5/`（含 `index.html`）
 - [ ] `.env.production` 的 `VITE_API_BASE_URL=/api`
+- [ ] 站点部署在**域名根路径**（未设 `base`，不支持子路径）
 - [ ] 刷新子路由不 404、登录/打卡/待办/倒计时/AI 全流程自测通过
 
 ### 前端·微信小程序
@@ -734,9 +860,11 @@ ls -1dt /opt/momentkeep/releases/*/ | tail -n +4 | xargs -r rm -rf
 
 ### 前端·App
 
+- [ ] **`@dcloudio/uni-app-plus` 已安装**，且 `npm run build:app` 产物含 `app-service.js`（见 §8.1）
 - [ ] Android 权限已精简至最小集
 - [ ] 图标 / 启动图 / Bundle ID / iOS 隐私描述已补齐
 - [ ] `VITE_API_BASE_URL_APP` 为 HTTPS 域名
+- [ ] 真机运行不再停在基座欢迎页（见 §8.5）
 - [ ] 已完成云打包并在真机安装验证
 
 ---
@@ -755,4 +883,11 @@ ls -1dt /opt/momentkeep/releases/*/ | tail -n +4 | xargs -r rm -rf
 | 小程序请求失败但浏览器正常 | 证书链不完整 / 域名未加入合法域名 / 未备案 |
 | 上传头像失败 | 检查 `client_max_body_size`、Spring 的 10MB 限制、图片是否 ≤5MB 且为 jpg/png/webp/gif |
 | 所有用户数据混在一起 | 说明运行的是修复前的版本，请确认已部署包含 `getCurrentUserId()` 的构建 |
-| `Build failed: isInSSRComponentSetup is not exported` | `@dcloudio/*` 被 `latest` 拉到与 `vue` 不匹配的版本；本项目 `package.json` 已改为**锁定精确版本**，重新 `npm ci` 即可 |
+| `Build failed: isInSSRComponentSetup is not exported` | `@dcloudio/*` 与 `vue` 版本不匹配。本项目已锁定精确版本，但仍需 `npm ci --legacy-peer-deps`（**不加 `--legacy-peer-deps` 会因 peer 冲突直接失败**） |
+| `npm ERR! ERESOLVE could not resolve` / `peer ... from the root project` | 项目存在 peer 冲突（`vue` 被钉在 3.4.21，而 `@dcloudio/*` 期望更高版本）。安装/更新依赖一律加 `--legacy-peer-deps` |
+| **真机运行日志显示成功，但手机停在「HBuilderX真机运行」欢迎页** | 见 §8.5：先确认 `dist/build/app/app-service.js` 是否存在（缺 `@dcloudio/uni-app-plus` 时最常见），再查基座版本/存储权限 |
+| 域名打开是白屏，但接口用 curl 正常 | ① Nginx `root` 指向的目录里没有 `index.html`（构建产物错落到 `dist/` 根）；② 站点被部署到子路径但没设 `vite.config.js` 的 `base` |
+| 浏览器控制台报跨域（CORS） | 说明你把页面和接口放在了**两个不同域名**。要么改成同域（推荐），要么把页面域名写入 `CORS_ALLOWED_ORIGINS` 并重启后端 |
+| 域名访问返回阿里云的「该网站未备案」提示页 | 大陆节点的 80/443 强制备案，与 Nginx/后端无关，等备案通过即可 |
+| 静态资源 404（`assets/xxx.js`） | 产物没传全：`scp -r dist/build/h5/*` 必须带 `-r`，且要包含 `assets/` 与 `static/` 子目录 |
+| 首页能打开但登录后立刻退回登录页 | 401：多为 `JWT_SECRET_KEY` 与签发时不一致（换密钥后旧令牌全部失效，属预期），或该账号令牌版本已被登出/改密自增 |

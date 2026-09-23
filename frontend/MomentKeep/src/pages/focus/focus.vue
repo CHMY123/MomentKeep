@@ -205,7 +205,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../../store/user'
 import { get, post } from '../../utils/request'
 // 注意：本文件已有同名的 formatTime（格式化时长），时间格式化需用别名导入
@@ -227,7 +227,6 @@ const elapsedTime = ref(0) // 总 elapsed time in seconds
 
 // 倒计时设置
 const countdownMinutes = ref(25)
-const countdownSeconds = ref(0)
 
 /** 倒计时时长步进参数：替代原先的裸 input 输入框 */
 const countdownStep = 5
@@ -520,7 +519,6 @@ const resetTimer = () => {
   stopTimer()
   displayTime.value = 0
   elapsedTime.value = 0
-  countdownSeconds.value = 0
   firedMilestones.clear()
 }
 

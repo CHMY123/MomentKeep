@@ -14,6 +14,18 @@
       
       <!-- 待办列表 -->
       <div class="todo-list">
+        <!--
+          加载态 / 空态。
+          此前两者都没有：首次进入或接口失败时页面是一片空白，
+          用户无法区分"确实没有待办"和"还没加载出来/加载失败了"。
+        -->
+        <div v-if="loading && todos.length === 0" class="list-state">
+          <span class="state-text">正在加载待办…</span>
+        </div>
+        <div v-else-if="!loading && todos.length === 0" class="list-state">
+          <span class="state-text">暂无待办事项，在上方输入框添加第一条吧</span>
+        </div>
+
         <div 
           v-for="todo in todos" 
           :key="todo.id"
@@ -190,7 +202,7 @@ const fetchTodos = async () => {
     todos.value = data
   } catch (error) {
     console.error('Error:', error)
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -237,7 +249,7 @@ const addTodo = async () => {
         uni.showToast({ title: response.message || '添加失败', icon: 'none' })
       }
     } catch (error) {
-      uni.showToast({ title: '网络错误', icon: 'none' })
+      uni.showToast({ title: error.message || '网络错误', icon: 'none' })
     }
   } else {
     uni.showToast({ title: '请输入待办标题', icon: 'none' })
@@ -341,7 +353,7 @@ const updateTodoStatus = async (id, completed) => {
       uni.showToast({ title: '更新失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   }
 }
 
@@ -402,7 +414,7 @@ const saveTodo = async () => {
         uni.showToast({ title: '更新失败', icon: 'none' })
       }
     } catch (error) {
-      uni.showToast({ title: '网络错误', icon: 'none' })
+      uni.showToast({ title: error.message || '网络错误', icon: 'none' })
     }
   }
 }
@@ -442,7 +454,7 @@ const deleteTodo = (id) => {
           uni.showToast({ title: '删除失败', icon: 'none' })
         }
       } catch (error) {
-        uni.showToast({ title: '网络错误', icon: 'none' })
+        uni.showToast({ title: error.message || '网络错误', icon: 'none' })
       }
     }
   }
@@ -496,7 +508,7 @@ const showFocusStats = async (todo) => {
       uni.showToast({ title: '获取专注记录失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   }
 }
 
@@ -621,16 +633,9 @@ onMounted(() => {
   line-height: 1;
 }
 
-.todo-icon::before {
-  content: "☐";
-}
-
+/* 复选框图标已迁到全局 src/styles/icons.css（自绘 base64 PNG，随 .completed 切换） */
 .todo-icon.completed {
   color: #C2977F;
-}
-
-.todo-icon.completed::before {
-  content: "☑";
 }
 
 /* 操作图标 */
@@ -649,16 +654,8 @@ onMounted(() => {
   color: #94A7C8;
 }
 
-.edit-icon::before {
-  content: "✏️";
-}
-
 .delete-icon {
   color: #D8C8BE;
-}
-
-.delete-icon::before {
-  content: "🗑️";
 }
 
 .edit-icon:hover {
@@ -916,5 +913,22 @@ onMounted(() => {
   .add-todo input {
     padding: 10px 14px;
   }
+}
+/* 加载态 / 空态提示（列表为空时替代整片空白） */
+.list-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  background-color: #F2EEE8;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.state-text {
+  font-size: 14px;
+  color: #999999;
+  text-align: center;
+  line-height: 1.6;
 }
 </style>

@@ -19,12 +19,14 @@
             </button>
           </div>
           <button 
-            v-else
+            v-else-if="dataReady"
             class="checkin-btn" 
             @click="checkin('early')"
           >
             打卡
           </button>
+          <!-- 加载期间不显示可点击的"打卡"按钮：既避免状态跳变，也避免误触重复打卡 -->
+          <div v-else class="checkin-loading">加载中…</div>
         </div>
         
         <!-- 睡眠打卡 -->
@@ -43,12 +45,13 @@
             </button>
           </div>
           <button 
-            v-else
+            v-else-if="dataReady"
             class="checkin-btn" 
             @click="checkin('sleep')"
           >
             打卡
           </button>
+          <div v-else class="checkin-loading">加载中…</div>
         </div>
         
         <!-- 用餐打卡 -->
@@ -58,7 +61,9 @@
             <div class="checkin-title">用餐打卡</div>
             <div class="checkin-status" v-if="checkins.meals.length > 0">已打卡 {{ checkins.meals.length }} 次</div>
           </div>
-          <div class="meal-types" v-if="checkins.meals.length === 0 || showAddMealType">
+          <!-- 加载期间先显示加载态：避免先渲染"选类型 + 打卡按钮"再跳变成已打卡记录 -->
+          <div class="checkin-loading" v-if="!dataReady">加载中…</div>
+          <div class="meal-types" v-else-if="checkins.meals.length === 0 || showAddMealType">
             <div 
               v-for="type in mealTypes" 
               :key="type"
@@ -97,7 +102,7 @@
             打卡
           </button>
           <button 
-            v-if="!showAddMealType && checkins.meals.length === 0"
+            v-if="dataReady && !showAddMealType && checkins.meals.length === 0"
             class="checkin-btn" 
             @click="checkin('meal')"
             :disabled="!selectedMealType"
@@ -113,7 +118,9 @@
             <div class="checkin-title">运动打卡</div>
             <div class="checkin-status" v-if="checkins.exercises.length > 0">已打卡 {{ checkins.exercises.length }} 次</div>
           </div>
-          <div class="exercise-types" v-if="checkins.exercises.length === 0 || showAddExerciseType">
+          <!-- 加载期间先显示加载态：避免先渲染"选类型 + 打卡按钮"再跳变成已打卡记录 -->
+          <div class="checkin-loading" v-if="!dataReady">加载中…</div>
+          <div class="exercise-types" v-else-if="checkins.exercises.length === 0 || showAddExerciseType">
             <div 
               v-for="type in exerciseTypes" 
               :key="type"
@@ -152,7 +159,7 @@
             打卡
           </button>
           <button 
-            v-if="!showAddExerciseType && checkins.exercises.length === 0"
+            v-if="dataReady && !showAddExerciseType && checkins.exercises.length === 0"
             class="checkin-btn" 
             @click="checkin('exercise')"
             :disabled="!selectedExerciseType"
@@ -179,7 +186,7 @@
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
                 </div>
-                <div v-else class="empty-checkin">暂无打卡</div>
+                <div v-else class="empty-checkin">{{ dataReady ? '暂无打卡' : '加载中…' }}</div>
               </div>
             </div>
             
@@ -194,7 +201,7 @@
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
                 </div>
-                <div v-else class="empty-checkin">暂无打卡</div>
+                <div v-else class="empty-checkin">{{ dataReady ? '暂无打卡' : '加载中…' }}</div>
               </div>
             </div>
             
@@ -209,7 +216,7 @@
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
                 </div>
-                <div v-else class="empty-checkin">暂无打卡</div>
+                <div v-else class="empty-checkin">{{ dataReady ? '暂无打卡' : '加载中…' }}</div>
               </div>
             </div>
             
@@ -224,7 +231,7 @@
                     <span class="checkin-time">{{ item.time }}</span>
                   </div>
                 </div>
-                <div v-else class="empty-checkin">暂无打卡</div>
+                <div v-else class="empty-checkin">{{ dataReady ? '暂无打卡' : '加载中…' }}</div>
               </div>
             </div>
           </div>
@@ -237,28 +244,28 @@
         <div class="stats-cards">
           <div class="stat-card">
             <div class="stat-title">早起打卡</div>
-            <div class="stat-value">{{ stats.earlyRate }}%</div>
+            <div class="stat-value">{{ dataReady ? stats.earlyRate + '%' : '—' }}</div>
             <div class="stat-chart">
               <div class="chart-bar" :style="{ width: stats.earlyRate + '%' }"></div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-title">睡眠打卡</div>
-            <div class="stat-value">{{ stats.sleepRate }}%</div>
+            <div class="stat-value">{{ dataReady ? stats.sleepRate + '%' : '—' }}</div>
             <div class="stat-chart">
               <div class="chart-bar" :style="{ width: stats.sleepRate + '%' }"></div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-title">用餐打卡</div>
-            <div class="stat-value">{{ stats.mealCount }}次/天</div>
+            <div class="stat-value">{{ dataReady ? stats.mealCount + '次/天' : '—' }}</div>
             <div class="stat-chart">
               <div class="chart-bar" :style="{ width: (stats.mealCount / 4) * 100 + '%' }"></div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-title">运动打卡</div>
-            <div class="stat-value">{{ stats.exerciseRate }}%</div>
+            <div class="stat-value">{{ dataReady ? stats.exerciseRate + '%' : '—' }}</div>
             <div class="stat-chart">
               <div class="chart-bar" :style="{ width: stats.exerciseRate + '%' }"></div>
             </div>
@@ -290,8 +297,30 @@
             </div>
           </div>
 
-          <!-- 柱状 + 折线 组合图：柱=各时段次数（左轴），折线=累计次数（右轴），双轴动态量程 -->
-          <checkin-time-chart :buckets="chartBuckets" />
+          <!--
+            口径切换：全部 / 早起 / 睡眠 / 用餐 / 运动。
+            各口径的数据在首次请求时已一并取回，切换是纯前端行为，不产生网络请求。
+          -->
+          <div class="scope-switch">
+            <div
+              v-for="scope in CHART_SCOPES"
+              :key="scope.key"
+              class="scope-item"
+              :class="{ active: chartScope === scope.key }"
+              @click="switchChartScope(scope.key)"
+            >{{ scope.label }}</div>
+          </div>
+
+          <!--
+            柱状 + 折线 组合图：
+            柱 = 当前口径各时段的次数（左轴），折线 = 打卡率（右轴 0~100%）。
+            两个序列量纲不同、含义独立（量 vs 坚持度），因此双轴在此是正确用法。
+          -->
+          <checkin-time-chart
+            :buckets="chartBuckets"
+            :rate="chartRate"
+            :scope-label="chartScopeLabel"
+          />
           <div class="distribution-tagline">{{ historyTagline }}</div>
         </div>
       </div>
@@ -386,15 +415,92 @@ const stats = reactive({
   exerciseRate: 0
 })
 
-// 加载状态
+// 加载状态（仅用于打卡/取消打卡等"动作进行中"）
 const loading = ref(false)
+
+/**
+ * 首屏数据是否已就绪
+ *
+ * @description 用于在初次加载期间隐藏"打卡按钮 / 暂无打卡 / 0%"这类误导性状态。
+ * 否则用户会先看到"可以打卡、没有记录"的形态，几百毫秒后整页跳变成真实数据，
+ * 每次切页都经历一次跳变，很容易疲劳。loading 只描述动作进行中，不能复用为它。
+ */
+const dataReady = ref(false)
 
 // 历史打卡：统计范围（'30d' 近30天 / 'all' 全部历史）
 const historyRange = ref('30d')
-// 历史打卡时间分布汇总（由后端聚合返回：total / buckets / typeCounts）
-const historySummary = ref({ total: 0, buckets: [], typeCounts: {} })
-// 图表数据：12 个时段分桶
-const chartBuckets = computed(() => historySummary.value.buckets || [])
+// 历史打卡时间分布汇总（由后端聚合返回）：
+//   total / activeDays / buckets / typeCounts / typeBuckets / bucketActiveDays / typeBucketDays
+//   buckets          -> 柱状（各时段次数）
+//   bucketActiveDays ÷ activeDays -> 折线（打卡率），两者是两个互相独立的维度
+//   type*            -> 供口径切换器使用，同一次响应里已含各类型数据，切换无需再请求
+const historySummary = ref({
+  total: 0,
+  activeDays: 0,
+  buckets: [],
+  typeCounts: {},
+  typeBuckets: {},
+  bucketActiveDays: [],
+  typeBucketDays: {}
+})
+
+/** 可切换的统计口径：全部 / 各类打卡 */
+const CHART_SCOPES = [
+  { key: 'all', label: '全部' },
+  { key: 'early', label: '早起' },
+  { key: 'sleep', label: '睡眠' },
+  { key: 'meal', label: '用餐' },
+  { key: 'exercise', label: '运动' }
+]
+
+/** 当前图表口径 */
+const chartScope = ref('all')
+
+/** 当前口径名称（图例与提示文案用） */
+const chartScopeLabel = computed(
+  () => (CHART_SCOPES.find(item => item.key === chartScope.value) || CHART_SCOPES[0]).label
+)
+
+/**
+ * 柱状数据：当前口径下 12 个时段的次数
+ *
+ * @description 切换口径不重新请求接口——同一次响应里已带各类型的分布，前端换一份数据即可，切换是即时的。
+ */
+const chartBuckets = computed(() => {
+  const summary = historySummary.value
+  const allBuckets = Array.isArray(summary.buckets) ? summary.buckets : []
+  if (chartScope.value === 'all') return allBuckets
+
+  const typeCounts = (summary.typeBuckets || {})[chartScope.value]
+  if (!Array.isArray(typeCounts)) return allBuckets.map(item => ({ label: item.label, count: 0 }))
+  return allBuckets.map((item, index) => ({ label: item.label, count: Number(typeCounts[index]) || 0 }))
+})
+
+/**
+ * 折线数据：当前口径下各时段的打卡率（%）
+ *
+ * @description 打卡率 = 该时段有打卡的天数 ÷ 区间内活跃天数。
+ * 它回答的是"这个时段我有多坚持"，与柱状回答的"这个时段量有多大"互相独立，
+ * 因此折线不是把柱状重画一遍。区间内没有任何打卡时返回空数组，图表退化为纯柱状图。
+ */
+const chartRate = computed(() => {
+  const summary = historySummary.value
+  const activeDays = Number(summary.activeDays) || 0
+  if (!activeDays) return []
+
+  const raw = chartScope.value === 'all'
+    ? summary.bucketActiveDays
+    : (summary.typeBucketDays || {})[chartScope.value]
+  if (!Array.isArray(raw)) return []
+
+  // 保留一位小数：百分比取整会丢失区分度（例如 8.3% 与 8.4%）
+  return raw.map(days => Math.round((Number(days) || 0) / activeDays * 1000) / 10)
+})
+
+/** 切换图表口径（纯前端切换，不重新请求） */
+const switchChartScope = (key) => {
+  chartScope.value = key
+}
 /**
  * 请求序号：快速来回切换「近30天 / 全部」时，只接受最后一次请求的响应，
  * 否则先发出的慢响应可能后到达，把新范围的数据覆盖掉
@@ -477,6 +583,11 @@ const timeDistribution = computed(() => {
 
 // 智能互动文案
 const distributionTagline = computed(() => {
+  // 首屏加载期间不要下"今天还没有打卡"的结论
+  if (!dataReady.value) {
+    return '正在加载今日打卡数据…'
+  }
+
   // 统计总打卡次数
   const totalCheckins = 
     (checkins.early ? 1 : 0) + 
@@ -576,6 +687,11 @@ const distributionTagline = computed(() => {
 
 // 历史打卡智能文案（基于服务端聚合结果，不再依赖明细列表）
 const historyTagline = computed(() => {
+  // 首屏加载期间不要下"还没有记录"的结论：数据到达时文案会突变
+  if (!dataReady.value) {
+    return '正在加载历史数据…'
+  }
+
   const totalCount = historySummary.value.total || 0
 
   if (totalCount === 0) {
@@ -767,7 +883,7 @@ const checkin = async (type) => {
       uni.showToast({ title: '打卡失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -913,7 +1029,7 @@ const cancelCheckin = async (type) => {
       uni.showToast({ title: '取消打卡失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -935,15 +1051,7 @@ const resetExerciseCheckin = () => {
   selectedExerciseType.value = ''
 }
 
-// 获取子类型列表
-const getSubTypes = (type) => {
-  if (type === 'meal') {
-    return mealTypes
-  } else if (type === 'exercise') {
-    return exerciseTypes
-  }
-  return []
-}
+
 
 /**
  * 处理打卡类型选择变化
@@ -1007,7 +1115,7 @@ const cancelMealCheckin = async (index) => {
       uni.showToast({ title: '取消打卡失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -1071,7 +1179,7 @@ const cancelExerciseCheckin = async (index) => {
       uni.showToast({ title: '取消打卡失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -1183,7 +1291,7 @@ const fetchCheckinStats = async () => {
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   // 检查是否登录
   if (!userStore.getToken) {
     uni.showToast({ title: '请先登录', icon: 'none' })
@@ -1193,10 +1301,12 @@ onMounted(() => {
     return
   }
 
-  // 初始化数据（异步加载，不阻塞页面渲染）
-  fetchCheckins()
-  fetchCheckinStats()
-  fetchHistorySummary()
+  // 初始化数据：三个请求并发，全部结束后才撤下加载态
+  try {
+    await Promise.all([fetchCheckins(), fetchCheckinStats(), fetchHistorySummary()])
+  } finally {
+    dataReady.value = true
+  }
 })
 </script>
 
@@ -1208,6 +1318,14 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
+/* 首屏加载占位：保持与卡片/按钮相近的高度，避免加载完成时产生跳变 */
+.checkin-loading {
+  padding: 12px 0;
+  text-align: center;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-muted, #999999);
+}
+
 /* 打卡卡片 */
 .checkin-cards {
   display: grid;
@@ -1217,7 +1335,7 @@ onMounted(() => {
 }
 
 .checkin-card {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -1230,7 +1348,7 @@ onMounted(() => {
 }
 
 .checkin-card.checked {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   border: 1px solid rgba(194, 151, 127, 0.3);
 }
 
@@ -1247,15 +1365,15 @@ onMounted(() => {
   right: 0;
   background-color: #C2977F;
   color: white;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   padding: 2px 8px;
   border-radius: 10px;
 }
 
 .checkin-icon {
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   margin-right: 12px;
-  color: #666666;
+  color: var(--text-secondary, #666666);
   transition: color 0.3s ease;
 }
 
@@ -1263,39 +1381,23 @@ onMounted(() => {
   color: #C2977F;
 }
 
-/* 图标样式 */
-.icon-sunny::before {
-  content: "☀️";
-}
-
-.icon-moon::before {
-  content: "🌙";
-}
-
-.icon-restaurant::before {
-  content: "🍽️";
-}
-
-.icon-run::before {
-  content: "🏃";
-}
-
+/* 图标样式已迁到全局 src/styles/icons.css（自绘 base64 PNG） */
 .checkin-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .checkin-time {
   margin-bottom: 16px;
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
 }
 
 .meal-type-text, .exercise-type-text {
   display: block;
-  font-size: 12px;
-  color: #999999;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted, #999999);
   margin-top: 4px;
 }
 
@@ -1306,7 +1408,7 @@ onMounted(() => {
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 500;
   transition: all 0.3s ease;
   cursor: pointer;
@@ -1329,12 +1431,12 @@ onMounted(() => {
 
 .cancel-btn {
   background-color: #f0f0f0;
-  color: #666666;
+  color: var(--text-secondary, #666666);
 }
 
 .cancel-btn:hover {
   background-color: #e0e0e0;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .checkin-records {
@@ -1353,22 +1455,27 @@ onMounted(() => {
 
 .checkin-record-info {
   flex: 1;
+  /* 横向展示"时间 + 事件"（此前是上下两行）：
+     时间有 min-width 撑开对齐，事件紧随其后 */
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
 }
 
 .checkin-record .checkin-time {
-  font-size: 14px;
-  color: #333333;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-color, #333333);
   min-width: 50px;
+  /* 旧上下堆叠布局遗留的 16px 下边距：改为横向排列后，
+     在 align-items: center 下它会把时间整体顶高 8px（半倍边距），与事件错位 */
+  margin-bottom: 0;
 }
 
 .checkin-record .meal-type-text,
 .checkin-record .exercise-type-text {
-  font-size: 12px;
-  color: #666666;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   margin-top: 0;
 }
 
@@ -1377,9 +1484,9 @@ onMounted(() => {
   height: 24px;
   border-radius: 50%;
   border: 1px solid #e0e0e0;
-  background-color: white;
-  color: #999999;
-  font-size: 18px;
+  background-color: var(--surface-strong, #FFFFFF);
+  color: var(--text-muted, #999999);
+  font-size: calc(18px * var(--font-scale, 1));
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -1408,14 +1515,14 @@ onMounted(() => {
 
 .meal-type, .exercise-type {
   padding: 8px 12px;
-  background-color: white;
-  border: 1px solid var(--sidebar-border, #D8C8BE);
+  background-color: var(--surface-strong, #FFFFFF);
+  border: 1px solid var(--sidebar-border, var(--border-color, #D8C8BE));
   border-radius: 6px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
 }
 
 .meal-type:hover, .exercise-type:hover {
@@ -1452,7 +1559,7 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-color, #333333);
   margin-bottom: 16px;
@@ -1467,20 +1574,20 @@ onMounted(() => {
 }
 
 .stat-card {
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   border-radius: 8px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .stat-title {
-  font-size: 14px;
-  color: #666666;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-secondary, #666666);
   margin-bottom: 8px;
 }
 
 .stat-value {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--primary-color, #C2977F);
   margin-bottom: 8px;
@@ -1510,7 +1617,7 @@ onMounted(() => {
 }
 
 .distribution-card {
-  background-color: #FFFFFF;
+  background-color: var(--surface-strong, #FFFFFF)FF;
   border-radius: 8px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -1518,7 +1625,7 @@ onMounted(() => {
 }
 
 .distribution-tagline {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: var(--primary-color, #C2977F);
   text-align: center;
   margin-bottom: 16px;
@@ -1548,7 +1655,7 @@ onMounted(() => {
 
 .range-item {
   padding: 5px 14px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: #8a7a6d;
   border-radius: 14px;
   cursor: pointer;
@@ -1561,6 +1668,32 @@ onMounted(() => {
   background-color: var(--primary-color, #C2977F);
 }
 
+/* 图表口径切换（全部 / 早起 / 睡眠 / 用餐 / 运动） */
+.scope-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scope-item {
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color-light, #E8E4DE);
+  background-color: var(--surface-strong, #FFFFFF);
+  color: var(--text-secondary, #666666);
+  font-size: calc(12px * var(--font-scale, 1));
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.scope-item.active {
+  color: #ffffff;
+  border-color: var(--primary-color, #C2977F);
+  background-color: var(--primary-color, #C2977F);
+}
+
 .chart-head-right {
   display: flex;
   align-items: center;
@@ -1568,12 +1701,12 @@ onMounted(() => {
 }
 
 .chart-total {
-  font-size: 12px;
-  color: #999999;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-muted, #999999);
 }
 
 .view-all {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--primary-color, #C2977F);
   cursor: pointer;
   white-space: nowrap;
@@ -1595,12 +1728,12 @@ onMounted(() => {
   border: 1px solid #E8D5C4;
   border-radius: 8px;
   overflow: hidden;
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .time-slot-header {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   padding: 12px 16px;
   border-bottom: 1px solid #E8D5C4;
   display: flex;
@@ -1609,7 +1742,7 @@ onMounted(() => {
 }
 
 .time-slot-title {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-color, #333333);
 }
@@ -1629,10 +1762,10 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background-color: #FFFFFF;
+  background-color: var(--surface-strong, #FFFFFF)FF;
   border-radius: 4px;
   border: 1px solid #E8D5C4;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
 }
 
 .checkin-type {
@@ -1642,16 +1775,16 @@ onMounted(() => {
 }
 
 .checkin-time {
-  color: #666666;
-  font-size: 12px;
+  color: var(--text-secondary, #666666);
+  font-size: calc(12px * var(--font-scale, 1));
   white-space: nowrap;
   margin-left: 12px;
 }
 
 .empty-checkin {
   text-align: center;
-  color: #999999;
-  font-size: 14px;
+  color: var(--text-muted, #999999);
+  font-size: calc(14px * var(--font-scale, 1));
   padding: 12px 0;
   font-style: italic;
 }
@@ -1684,13 +1817,13 @@ onMounted(() => {
 }
 
 .type-count {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: #666;
   margin-left: 8px;
 }
 
 .expand-icon {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: #666;
   transition: transform 0.3s ease;
 }
@@ -1708,12 +1841,12 @@ onMounted(() => {
 }
 
 .more-btn {
-  background-color: #F2EEE8;
+  background-color: var(--surface-color, #F2EEE8);
   border: 1px solid #C2977F;
   color: #C2977F;
   padding: 6px 12px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -1738,7 +1871,7 @@ onMounted(() => {
 }
 
 .modal-content {
-  background-color: white;
+  background-color: var(--surface-strong, #FFFFFF);
   border-radius: 12px;
   width: 90%;
   max-width: 400px;
@@ -1754,15 +1887,15 @@ onMounted(() => {
 }
 
 .modal-header h3 {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 500;
-  color: #333333;
+  color: var(--text-color, #333333);
 }
 
 .close-icon {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale, 1));
   cursor: pointer;
-  color: #999999;
+  color: var(--text-muted, #999999);
 }
 
 .modal-body {
@@ -1772,10 +1905,10 @@ onMounted(() => {
 .modal-body input {
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid #D8C8BE;
+  border: 1px solid var(--border-color, #D8C8BE);
   border-radius: 8px;
-  font-size: 14px;
-  color: #333333;
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text-color, #333333);
 }
 
 .modal-footer {
@@ -1790,14 +1923,14 @@ onMounted(() => {
   padding: 8px 16px;
   border: 1px solid #d9d9d9;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .cancel-btn {
-  background-color: white;
-  color: #333333;
+  background-color: var(--surface-strong, #FFFFFF);
+  color: var(--text-color, #333333);
 }
 
 .confirm-btn {

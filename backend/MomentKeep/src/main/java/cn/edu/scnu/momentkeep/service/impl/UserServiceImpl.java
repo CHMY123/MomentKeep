@@ -41,6 +41,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -86,6 +88,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public void register(UserRegisterDTO dto) {
+        // 服务端必须复核"已同意协议"：前端勾选只是 UI 约束，直接调接口可以绕过，
+        // 那样就缺少"取得用户同意"的证据（个人信息保护法要求）
+        // 字段是原始类型 boolean，Lombok 生成的是 isAgreement()；
+        // 未携带该字段的请求会被反序列化为 false，因此同样会被拦下
+        if (!dto.isAgreement()) {
+            throw new BusinessException("请先阅读并同意用户协议与隐私政策");
+        }
+
         // 检查用户是否存在
         User existingUser = userMapper.selectOne(new QueryWrapper<User>().eq("username", dto.getUsername()));
         if (existingUser != null) {
@@ -128,26 +138,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 生成token（不使用Redis存储，简化部署；通过令牌版本号支持吊销）
         String token = jwtTokenProvider.generateToken(user.getUsername(), user.getTokenVersion());
 
-        // 构建响应
+        // 构建响应：与 /user/profile 共用同一份映射，保证字段集合一致
         LoginResponseVO response = new LoginResponseVO();
         response.setToken(token);
-
-        UserProfileVO profile = new UserProfileVO();
-        profile.setId(user.getId());
-        profile.setUsername(user.getUsername());
-        profile.setNickname(user.getNickname());
-        profile.setEmail(user.getEmail());
-        profile.setPhone(user.getPhone());
-        profile.setAvatar(user.getAvatar());
-        response.setUser(profile);
+        response.setUser(buildProfile(user));
 
         return response;
     }
 
     @Override
     public UserProfileVO getProfile() {
-        User user = getCurrentUser();
+        return buildProfile(getCurrentUser());
+    }
 
+    /**
+     * 构造用户资料视图
+     *
+     * <p>登录与查询资料必须共用同一份映射逻辑。此前 {@code login} 手写了一份
+     * 缺少 {@code backgroundImage} 的映射，导致登录响应没有该字段；
+     * 前端据此认为"用户没有背景图"进而清掉了本地缓存，
+     * 表现为登录后背景图要等刷新或切页才出现。字段一旦分叉就会再次跑偏，故收敛到一处。</p>
+     *
+     * @param user 用户实体
+     * @return 含背景图的用户资料视图
+     */
+    private UserProfileVO buildProfile(User user) {
         UserProfileVO profile = new UserProfileVO();
         profile.setId(user.getId());
         profile.setUsername(user.getUsername());
@@ -308,17 +323,49 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 2. 让所有已签发令牌立即失效
         userMapper.incrementTokenVersion(userId);
 
-        // 3. 更新用户状态为注销
-        User user = new User();
-        user.setId(userId);
-        user.setStatus(STATUS_DELETED);
-        userMapper.updateById(user);
+        // 3. 注销并匿名化
+        //    仅把 status 置为 -1 会长期保留手机号 / 邮箱 / 昵称等个人信息，
+        //    且 username 被永久占用（无法同名重注册），因此这里一并脱敏。
+        //    注意：MyBatis-Plus 的 updateById 默认不更新 null 字段，
+        //    必须用 UpdateWrapper 的 set(..., null) 才能把列真正置空。
+        UpdateWrapper<User> anonymize = new UpdateWrapper<>();
+        anonymize.eq("id", userId)
+                .set("status", STATUS_DELETED)
+                .set("username", "deleted_" + userId + "_" + UUID.randomUUID().toString().substring(0, 8))
+                .set("nickname", "已注销用户")
+                .set("phone", null)
+                .set("email", null)
+                .set("avatar", null)
+                .set("password", passwordEncoder.encode(UUID.randomUUID().toString()));
+        userMapper.update(null, anonymize);
 
-        // 4. 尽力清理对象存储上的头像与背景图（失败只记日志，不影响注销结果）
-        deleteObjectQuietly(avatarUrl, "头像");
-        deleteObjectQuietly(backgroundUrl, "背景图");
+        // 4. 对象存储清理放到事务提交之后
+        //    S3 删除不可回滚：若放在事务内，一旦后续失败回滚，会出现"对象已删、数据回滚"
+        //    的不一致；同时也能避免在事务持锁期间做网络 IO。
+        registerAfterCommit(() -> {
+            deleteObjectQuietly(avatarUrl, "头像");
+            deleteObjectQuietly(backgroundUrl, "背景图");
+        });
 
-        log.info("用户已注销：userId={}", userId);
+        log.info("用户已注销并匿名化：userId={}", userId);
+    }
+
+    /**
+     * 事务提交后执行（当前不在事务中时立即执行）
+     *
+     * @param action 待执行动作
+     */
+    private void registerAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     /**

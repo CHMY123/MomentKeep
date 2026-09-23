@@ -62,10 +62,17 @@ export const useUserStore = defineStore('user', {
       this.userInfo = info
       this.isLoggedIn = true
       uni.setStorageSync('userInfo', info)
-      if (info.backgroundImage && info.backgroundImage.trim() !== '') {
-        uni.setStorageSync('backgroundImage', info.backgroundImage)
-      } else {
-        uni.removeStorageSync('backgroundImage')
+      // 只有响应里"确实带了 backgroundImage 字段"时才同步本地缓存：
+      //   字段缺失（部分接口只回传基础信息） -> 保持现状，不要动缓存
+      //   字段为 null / 空串（用户主动清除）  -> 清除缓存
+      // 之前用 if (info.backgroundImage) 直接判定，字段缺失会被当成"没有背景图"，
+      // 于是登录时把本地缓存的背景图删掉，界面要等再次拉到资料才恢复。
+      if (info && Object.prototype.hasOwnProperty.call(info, 'backgroundImage')) {
+        if (info.backgroundImage && info.backgroundImage.trim() !== '') {
+          uni.setStorageSync('backgroundImage', info.backgroundImage)
+        } else {
+          uni.removeStorageSync('backgroundImage')
+        }
       }
     },
 

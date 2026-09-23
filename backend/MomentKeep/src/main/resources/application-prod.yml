@@ -1,0 +1,33 @@
+# ============================================================================
+# 生产环境覆盖配置（通过 --spring.profiles.active=prod 激活）
+# ============================================================================
+# 说明：本文件会被打进 jar，因此**不得**出现任何密钥；
+#       数据库、JWT、DeepSeek、S3 的凭据一律由环境变量注入。
+# ============================================================================
+
+springdoc:
+  # 生产关闭接口文档：/v3/api-docs 与 /swagger-ui 会暴露全部接口与 DTO 结构
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+server:
+  # 建议：只监听本机，由 Nginx 反向代理对外提供服务，
+  # 避免绕过 Nginx 直连 8080 绕过限流与访问日志。
+  # 未使用 Nginx 时请保持注释。
+  # address: 127.0.0.1
+  tomcat:
+    threads:
+      max: 100
+      min-spare: 10
+    accept-count: 100
+
+logging:
+  file:
+    name: /opt/momentkeep/logs/app.log
+  logback:
+    rollingpolicy:
+      max-file-size: 20MB
+      max-history: 7
+      total-size-cap: 500MB

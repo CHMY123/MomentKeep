@@ -229,56 +229,104 @@ public class CheckinServiceImpl implements CheckinService {
      *
      * <p>此前前端只能取最近 30 条记录在客户端聚合，「历史分布」名不副实。
      * 这里把聚合下推到数据库（{@code GROUP BY HOUR(checkin_time)}），
-     * 只回传 12 个时段分桶 + 分类计数，避免把全部明细拉进内存。</p>
+     * 只回传 12 个时段分桶，避免把全部明细拉进内存。</p>
+     *
+     * <p>除「次数」外，同时给出「打卡率」所需的分子分母：
+     * {@code COUNT(DISTINCT DATE(checkin_time))} 取每个时段的「有打卡天数」，
+     * 再除以区间内的活跃天数。次数量的是「打得多不多」，打卡率量的是「坚持得久不久」，
+     * 两者互相独立，折线与柱状因此各表一义，而不是同一份数据画两遍。</p>
      *
      * @param userId    当前用户
      * @param startDate 起始日期（含），可为 null 表示不限
      * @param endDate   结束日期（含），可为 null 表示不限
-     * @return total / buckets / typeCounts
+     * @return total / activeDays / buckets / typeCounts / typeBuckets / bucketActiveDays / typeBucketDays
      */
     @Override
     public Map<String, Object> getTimeDistributionSummary(Long userId, LocalDate startDate, LocalDate endDate) {
-        QueryWrapper<Checkin> wrapper = new QueryWrapper<>();
-        wrapper.select("HOUR(checkin_time) AS hour_of_day", "type AS type", "COUNT(*) AS cnt")
+        // 查询 1：按「小时 × 类型」一次分组，同时取次数与有打卡天数（两个维度一次扫描即可拿到）
+        QueryWrapper<Checkin> typeWrapper = new QueryWrapper<>();
+        typeWrapper.select("HOUR(checkin_time) AS hour_of_day", "type AS type",
+                        "COUNT(*) AS cnt", "COUNT(DISTINCT DATE(checkin_time)) AS day_cnt")
                 .eq("user_id", userId)
                 .groupBy("HOUR(checkin_time)", "type");
+        applyDateRange(typeWrapper, startDate, endDate);
+
+        int[] bucketCounts = new int[TIME_BUCKET_COUNT];
+        Map<String, Integer> typeCounts = new LinkedHashMap<>();
+        Map<String, int[]> typeBucketCounts = new LinkedHashMap<>();
+        Map<String, int[]> typeBucketDays = new LinkedHashMap<>();
+        int total = 0;
+
+        for (Map<String, Object> row : checkinMapper.selectMaps(typeWrapper)) {
+            int hour = toInt(row.get("hour_of_day"));
+            int count = toInt(row.get("cnt"));
+            int days = toInt(row.get("day_cnt"));
+            String type = row.get("type") == null ? "unknown" : row.get("type").toString();
+
+            int index = Math.min(Math.max(hour, 0) / 2, TIME_BUCKET_COUNT - 1);
+            bucketCounts[index] += count;
+            typeCounts.merge(type, count, Integer::sum);
+            typeBucketCounts.computeIfAbsent(type, k -> new int[TIME_BUCKET_COUNT])[index] += count;
+            // 该 (小时, 类型) 只有一行，直接落位即可，不需要累加
+            typeBucketDays.computeIfAbsent(type, k -> new int[TIME_BUCKET_COUNT])[index] = days;
+            total += count;
+        }
+
+        // 查询 2：全类型口径下每个时段的有打卡天数。
+        // 必须单独查：同一天在 8 点既早起又用餐，按类型相加会被算成 2 天，去重必须在"全部类型"层面做。
+        QueryWrapper<Checkin> dayWrapper = new QueryWrapper<>();
+        dayWrapper.select("HOUR(checkin_time) AS hour_of_day", "COUNT(DISTINCT DATE(checkin_time)) AS day_cnt")
+                .eq("user_id", userId)
+                .groupBy("HOUR(checkin_time)");
+        applyDateRange(dayWrapper, startDate, endDate);
+
+        int[] bucketActiveDays = new int[TIME_BUCKET_COUNT];
+        for (Map<String, Object> row : checkinMapper.selectMaps(dayWrapper)) {
+            int index = Math.min(Math.max(toInt(row.get("hour_of_day")), 0) / 2, TIME_BUCKET_COUNT - 1);
+            bucketActiveDays[index] += toInt(row.get("day_cnt"));
+        }
+
+        // 查询 3：区间内的活跃天数（有任意打卡的天数），作为打卡率的分母。
+        // 用「活跃天数」而非「自然天数」：全部历史口径下跨度可能几年，用自然天数会让比率低到没有意义。
+        QueryWrapper<Checkin> activeWrapper = new QueryWrapper<>();
+        activeWrapper.select("COUNT(DISTINCT DATE(checkin_time)) AS active_days").eq("user_id", userId);
+        applyDateRange(activeWrapper, startDate, endDate);
+
+        List<Map<String, Object>> activeRows = checkinMapper.selectMaps(activeWrapper);
+        int activeDays = activeRows.isEmpty() ? 0 : toInt(activeRows.get(0).get("active_days"));
+
+        List<Map<String, Object>> buckets = new ArrayList<>(TIME_BUCKET_COUNT);
+        for (int i = 0; i < TIME_BUCKET_COUNT; i++) {
+            Map<String, Object> bucket = new LinkedHashMap<>(2);
+            bucket.put("label", bucketLabel(i));
+            bucket.put("count", bucketCounts[i]);
+            buckets.add(bucket);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>(7);
+        result.put("total", total);
+        result.put("activeDays", activeDays);
+        result.put("buckets", buckets);
+        result.put("typeCounts", typeCounts);
+        result.put("typeBuckets", typeBucketCounts);
+        result.put("bucketActiveDays", bucketActiveDays);
+        result.put("typeBucketDays", typeBucketDays);
+        return result;
+    }
+
+    /** 时段标签，如 0 -> "00-02" */
+    private String bucketLabel(int index) {
+        return String.format("%02d-%02d", index * 2, index * 2 + 2);
+    }
+
+    /** 给查询附加日期区间条件（endDate 含当天，故用「< 次日零点」） */
+    private void applyDateRange(QueryWrapper<Checkin> wrapper, LocalDate startDate, LocalDate endDate) {
         if (startDate != null) {
             wrapper.ge("checkin_time", startDate.atStartOfDay());
         }
         if (endDate != null) {
             wrapper.lt("checkin_time", endDate.plusDays(1).atStartOfDay());
         }
-
-        List<Map<String, Object>> rows = checkinMapper.selectMaps(wrapper);
-
-        int[] bucketCounts = new int[TIME_BUCKET_COUNT];
-        Map<String, Integer> typeCounts = new LinkedHashMap<>();
-        int total = 0;
-
-        for (Map<String, Object> row : rows) {
-            int hour = toInt(row.get("hour_of_day"));
-            int count = toInt(row.get("cnt"));
-            Object type = row.get("type");
-
-            int index = Math.min(Math.max(hour, 0) / 2, TIME_BUCKET_COUNT - 1);
-            bucketCounts[index] += count;
-            typeCounts.merge(type == null ? "unknown" : type.toString(), count, Integer::sum);
-            total += count;
-        }
-
-        List<Map<String, Object>> buckets = new ArrayList<>(TIME_BUCKET_COUNT);
-        for (int i = 0; i < TIME_BUCKET_COUNT; i++) {
-            Map<String, Object> bucket = new LinkedHashMap<>(2);
-            bucket.put("label", String.format("%02d-%02d", i * 2, i * 2 + 2));
-            bucket.put("count", bucketCounts[i]);
-            buckets.add(bucket);
-        }
-
-        Map<String, Object> result = new LinkedHashMap<>(3);
-        result.put("total", total);
-        result.put("buckets", buckets);
-        result.put("typeCounts", typeCounts);
-        return result;
     }
 
     /**

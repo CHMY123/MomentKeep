@@ -8,6 +8,8 @@
  */
 import { onMounted } from 'vue'
 import { useUserStore } from './store/user'
+import { applySavedFontScale } from './utils/fontScale'
+import { applySavedTheme } from './utils/theme'
 
 const userStore = useUserStore()
 
@@ -22,24 +24,35 @@ onMounted(() => {
   } catch (error) {
     console.error('初始化用户信息失败:', error)
   }
+
+  // 在应用根部恢复字号与主题偏好：放在这里而非设置页，
+  // 才能让未使用 Layout 的页面也生效，并且刷新后不会退回默认值。
+  applySavedFontScale()
+  applySavedTheme()
 })
 </script>
 
 <style>
+/* 自绘图标（内联 base64，零外部依赖）。放在最前面，确保各页面 scoped 样式能按需覆盖它。 */
+@import './styles/icons.css';
+
 /*
- * 全局 CSS 变量。
- * H5 下 :root 生效；小程序 / App 下没有 :root，必须同时声明在 page 选择器上，
- * 否则 todo.vue 等页面里的 var(--base-font-size) 会取不到值、字号失效。
- * 同时给所有变量提供字面量兜底值，做到两端都能正常渲染。
+ * 全局 CSS 变量说明（这里刻意"不"声明任何主题 / 字号变量）
+ *
+ * 【为什么不能在这里声明】
+ * 该选择器在 H5 会被编译为 `:root, uni-page-body`，而 uni-page-body 是
+ * uni-app 的页面根容器，位于 <html> 与各组件之间。一旦在此声明变量，
+ * 它的值就会遮蔽运行时写进 documentElement 的值——
+ *   · 字号设置失效（实测：inline 已是 1.15，元素计算值仍为 16px）；
+ *   · 换肤只对"未被声明的变量"生效，表现为侧栏变黑、内容区不变的半深半浅状态。
+ *
+ * 【正确做法】
+ * 所有变量只在"使用处"提供兜底值，例如 var(--text-color, #333333)。
+ * 小程序 / App 端没有 document、无法运行时修改变量，取兜底值即正常渲染；
+ * H5 端既能取兜底值，又允许运行时覆盖。
+ *
+ * 变量清单与三套主题取值见 pages/settings/settings.vue 的 applyTheme。
  */
-:root,
-page {
-  --bg-color: #F8F6F2;
-  --text-color: #333333;
-  --primary-color: #C2977F;
-  --secondary-color: #94A7C8;
-  --base-font-size: 16px;
-}
 
 page,
 view,
@@ -60,7 +73,7 @@ picker-view {
 page,
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  font-size: var(--base-font-size, 16px);
+  font-size: calc(16px * var(--font-scale, 1));
   background-color: var(--bg-color, #F8F6F2);
   color: var(--text-color, #333333);
 }

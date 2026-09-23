@@ -176,8 +176,9 @@ public class AiChatServiceImpl implements AiChatService {
             String body = response.body() == null ? "" : response.body().string();
 
             if (!response.isSuccessful()) {
-                // 记录响应体才可能定位到 401（密钥失效）/ 429（余额或限频）等问题
-                log.error("DeepSeek 调用失败：status={}, body={}", response.code(), body);
+                // 记录响应体才能定位 401（密钥失效）/ 429（余额或限频）等问题，
+                // 但需截断：部分错误响应会回显用户输入，完整打印会把用户内容写进日志
+                log.error("DeepSeek 调用失败：status={}, body={}", response.code(), brief(body, 200));
                 throw new IOException("DeepSeek 返回状态码 " + response.code());
             }
 
@@ -190,7 +191,8 @@ public class AiChatServiceImpl implements AiChatService {
         try {
             responseMap = objectMapper.readValue(responseBody, new TypeReference<Map<String, Object>>() {});
         } catch (JsonProcessingException e) {
-            log.error("DeepSeek 响应不是合法 JSON：{}", responseBody);
+            // 只记录长度，不打印响应原文（可能包含用户提问与模型回答内容）
+            log.error("DeepSeek 响应不是合法 JSON：长度={}", responseBody == null ? 0 : responseBody.length());
             throw new IOException("DeepSeek 响应解析失败", e);
         }
 
@@ -205,8 +207,24 @@ public class AiChatServiceImpl implements AiChatService {
                 }
             }
         }
-        log.error("DeepSeek 响应缺少 choices[0].message.content：{}", responseBody);
+        // 同上：只记录长度，避免把用户内容写进日志
+        log.error("DeepSeek 响应缺少 choices[0].message.content：长度={}",
+                responseBody == null ? 0 : responseBody.length());
         throw new IOException("DeepSeek 响应结构异常");
+    }
+
+    /**
+     * 截断字符串用于日志输出
+     *
+     * @param value 原字符串
+     * @param maxLength 最大保留长度
+     * @return 截断后的字符串
+     */
+    private static String brief(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength) + "...(truncated)";
     }
 
     @Override

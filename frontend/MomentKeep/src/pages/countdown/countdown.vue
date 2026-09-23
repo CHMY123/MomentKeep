@@ -9,6 +9,11 @@
       
       <!-- 倒计时列表 -->
       <div class="countdown-list">
+        <!-- 加载态：原先 loading 只赋值不使用，首次进入会先闪一下"暂无倒计时" -->
+        <div v-if="loading && countdowns.length === 0" class="list-state">
+          <span class="state-text">正在加载倒计时…</span>
+        </div>
+
         <div 
           v-for="countdown in countdowns" 
           :key="countdown.id"
@@ -44,8 +49,9 @@
             <span v-if="countdown.description" class="countdown-description">{{ countdown.description }}</span>
           </div>
         </div>
-        <div v-if="countdowns.length === 0" class="empty-countdown">
-          <span>暂无倒计时</span>
+        <!-- 仅在"加载完成且确实没有数据"时才提示空态，避免加载中误报 -->
+        <div v-if="!loading && countdowns.length === 0" class="empty-countdown">
+          <span>暂无倒计时，点击上方按钮添加一个吧</span>
         </div>
       </div>
       
@@ -95,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import Layout from '../../components/Layout.vue'
 import { useUserStore } from '../../store/user'
 import { get, post, put, del } from '../../utils/request'
@@ -269,7 +275,7 @@ const fetchCountdowns = async () => {
     const data = await fetchWithCache('countdowns_detail', fetchFn)
     countdowns.value = data
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -377,7 +383,7 @@ const saveCountdownWithTargetDate = async (targetDate) => {
       uni.showToast({ title: '操作失败', icon: 'none' })
     }
   } catch (error) {
-    uni.showToast({ title: '网络错误', icon: 'none' })
+    uni.showToast({ title: error.message || '网络错误', icon: 'none' })
   }
 }
 
@@ -466,7 +472,7 @@ const deleteCountdown = (id) => {
             uni.showToast({ title: '删除失败', icon: 'none' })
           }
         } catch (error) {
-          uni.showToast({ title: '网络错误', icon: 'none' })
+          uni.showToast({ title: error.message || '网络错误', icon: 'none' })
         }
       }
     }
@@ -634,6 +640,24 @@ onUnmounted(() => {
   line-height: 1.4;
 }
 
+/* 加载态提示 */
+.list-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  background-color: #F2EEE8;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.state-text {
+  font-size: 14px;
+  color: #999999;
+  text-align: center;
+  line-height: 1.6;
+}
+
 .empty-countdown {
   text-align: center;
   padding: 40px 0;
@@ -671,16 +695,8 @@ onUnmounted(() => {
   color: #94A7C8;
 }
 
-.edit-icon::before {
-  content: "✏️";
-}
-
 .delete-icon {
   color: #D8C8BE;
-}
-
-.delete-icon::before {
-  content: "🗑️";
 }
 
 .edit-icon:hover {
